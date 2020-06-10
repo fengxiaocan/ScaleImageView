@@ -32,8 +32,8 @@ public class ImageActivity extends AppCompatActivity{
             @Override
             public void loadImage(final ScaleImageView imageView,String path,int position){
 
-//                if(position%2==0){
-////                    Glide.with(imageView.getContext()).load("file:///android_asset/abd.gif").into(imageView);
+                if(position%2==0){
+                    Glide.with(imageView.getContext()).load("file:///android_asset/abd.gif").into(imageView);
 //                    Glide.with(imageView.getContext())
 //                         .asFile()
 //                         .load("http://s1.dgtle.com/dgtle_img/ins-comment/2020/05/28"+"/e5dda202005281257525499.jpeg")
@@ -63,9 +63,9 @@ public class ImageActivity extends AppCompatActivity{
 //                             }
 //                         })
 //                         .submit();
-//                } else{
+                } else{
                     imageView.setImage(ImageSource.asset("abc.jpg"));
-//                }
+                }
             }
         });
         ArrayList<String> datas=new ArrayList<>();

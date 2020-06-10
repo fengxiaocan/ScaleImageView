@@ -126,7 +126,12 @@ public class ImageWatcher extends FrameLayout implements ViewPager.OnPageChangeL
                 }
                 break;
         }
-        return super.dispatchTouchEvent(event);
+        try{
+            return super.dispatchTouchEvent(event);
+        } catch(Exception e){
+            e.printStackTrace();
+            return false;
+        }
     }
 
     @Override
@@ -165,7 +170,12 @@ public class ImageWatcher extends FrameLayout implements ViewPager.OnPageChangeL
                 break;
 
         }
-        return super.onInterceptTouchEvent(event);
+        try{
+            return super.onInterceptTouchEvent(event);
+        } catch(Exception e){
+            e.printStackTrace();
+            return false;
+        }
     }
 
     /**

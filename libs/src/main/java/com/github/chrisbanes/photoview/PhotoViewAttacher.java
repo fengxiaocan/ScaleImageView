@@ -151,6 +151,11 @@ public class PhotoViewAttacher implements View.OnTouchListener, View.OnLayoutCha
                     mScaleChangeListener.onScaleChange(scaleFactor,focusX,focusY);
                 }
                 mSuppMatrix.postScale(scaleFactor,scaleFactor,focusX,focusY);
+
+                final float min=mMinScale*0.5f;
+                if(getScale()<=min){
+                    mSuppMatrix.setScale(min,min);
+                }
                 checkAndDisplayMatrix();
             }
         }
