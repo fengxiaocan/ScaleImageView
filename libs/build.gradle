@@ -29,5 +29,5 @@ dependencies {
 
     implementation 'androidx.appcompat:appcompat:1.0.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
-    implementation 'com.drewnoakes:metadata-extractor:2.15.0'
+    api 'com.drewnoakes:metadata-extractor:2.15.0'
 }
