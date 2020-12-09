@@ -64,7 +64,7 @@ public class ImageActivity extends AppCompatActivity{
 //                         })
 //                         .submit();
                 } else{
-                    imageView.setImage(ImageSource.asset("abc.jpg"));
+                    imageView.setImage(ImageSource.asset("IMG_1505.JPG"));
                 }
             }
         });

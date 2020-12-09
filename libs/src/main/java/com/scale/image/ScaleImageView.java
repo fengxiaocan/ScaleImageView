@@ -37,6 +37,7 @@ import com.github.chrisbanes.photoview.PhotoView;
 import com.scale.image.decoder.CompatDecoderFactory;
 import com.scale.image.decoder.DecoderFactory;
 import com.scale.image.decoder.ImageDecoder;
+import com.scale.image.decoder.ImageDecoder2;
 import com.scale.image.decoder.ImageRegionDecoder;
 import com.scale.image.decoder.SkiaImageDecoder;
 import com.scale.image.decoder.SkiaImageRegionDecoder;
@@ -127,7 +128,7 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
     protected boolean debug=false;
 
     // Image orientation setting
-    protected int orientation=ORIENTATION_0;
+    protected int orientation = ORIENTATION_USE_EXIF;
 
     // Max scale allowed (prevent infinite zoom)
     protected float maxScale=2F;
@@ -264,201 +265,204 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
     protected static Bitmap.Config preferredBitmapConfig;
 
 
-    public ScaleImageView(Context context,@Nullable AttributeSet attr,int defStyleAttr){
-        super(context,attr,defStyleAttr);
-        density=getResources().getDisplayMetrics().density;
+    public ScaleImageView(Context context,@Nullable AttributeSet attr,int defStyleAttr) {
+        super(context, attr, defStyleAttr);
+        density = getResources().getDisplayMetrics().density;
         setMinimumDpi(160);
         setDoubleTapZoomDpi(160);
         setMinimumTileDpi(320);
         setGestureDetector(context);
-        this.handler=new Handler(new Handler.Callback(){
-            public boolean handleMessage(Message message){
-                if(message.what==MESSAGE_LONG_CLICK){
-                    maxTouchCount=0;
+        this.handler = new Handler(new Handler.Callback() {
+            public boolean handleMessage(Message message) {
+                if (message.what == MESSAGE_LONG_CLICK) {
+                    maxTouchCount = 0;
                     performLongClick();
                 }
                 return true;
             }
         });
         // Handle XML attributes
-        if(attr!=null){
-            TypedArray typedAttr=getContext().obtainStyledAttributes(attr,R.styleable.ScaleImageView);
-            if(typedAttr.hasValue(R.styleable.ScaleImageView_assetName)){
-                String assetName=typedAttr.getString(R.styleable.ScaleImageView_assetName);
-                if(assetName!=null&&assetName.length()>0){
+        if (attr != null) {
+            TypedArray typedAttr = getContext().obtainStyledAttributes(attr, R.styleable.ScaleImageView);
+            if (typedAttr.hasValue(R.styleable.ScaleImageView_assetName)) {
+                String assetName = typedAttr.getString(R.styleable.ScaleImageView_assetName);
+                if (assetName != null && assetName.length() > 0) {
                     setImage(ImageSource.asset(assetName).tilingEnabled());
                 }
             }
-            if(typedAttr.hasValue(R.styleable.ScaleImageView_src)){
-                int resId=typedAttr.getResourceId(R.styleable.ScaleImageView_src,0);
-                if(resId>0){
+            if (typedAttr.hasValue(R.styleable.ScaleImageView_src)) {
+                int resId = typedAttr.getResourceId(R.styleable.ScaleImageView_src, 0);
+                if (resId > 0) {
                     setImage(ImageSource.resource(resId).tilingEnabled());
                 }
             }
-            if(typedAttr.hasValue(R.styleable.ScaleImageView_panEnabled)){
-                setPanEnabled(typedAttr.getBoolean(R.styleable.ScaleImageView_panEnabled,true));
+            if (typedAttr.hasValue(R.styleable.ScaleImageView_panEnabled)) {
+                setPanEnabled(typedAttr.getBoolean(R.styleable.ScaleImageView_panEnabled, true));
             }
-            if(typedAttr.hasValue(R.styleable.ScaleImageView_zoomEnabled)){
-                setZoomEnabled(typedAttr.getBoolean(R.styleable.ScaleImageView_zoomEnabled,true));
+            if (typedAttr.hasValue(R.styleable.ScaleImageView_zoomEnabled)) {
+                setZoomEnabled(typedAttr.getBoolean(R.styleable.ScaleImageView_zoomEnabled, true));
             }
-            if(typedAttr.hasValue(R.styleable.ScaleImageView_quickScaleEnabled)){
-                setQuickScaleEnabled(typedAttr.getBoolean(R.styleable.ScaleImageView_quickScaleEnabled,true));
+            if (typedAttr.hasValue(R.styleable.ScaleImageView_quickScaleEnabled)) {
+                setQuickScaleEnabled(typedAttr.getBoolean(R.styleable.ScaleImageView_quickScaleEnabled, true));
             }
-            if(typedAttr.hasValue(R.styleable.ScaleImageView_tileBackgroundColor)){
+            if (typedAttr.hasValue(R.styleable.ScaleImageView_tileBackgroundColor)) {
                 setTileBackgroundColor(typedAttr.getColor(R.styleable.ScaleImageView_tileBackgroundColor,
-                                                          Color.argb(0,0,0,0)));
+                        Color.argb(0, 0, 0, 0)));
             }
             typedAttr.recycle();
         }
 
-        quickScaleThreshold=TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
-                                                      20,
-                                                      context.getResources().getDisplayMetrics());
+        quickScaleThreshold = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                20,
+                context.getResources().getDisplayMetrics());
 
     }
 
-    public ScaleImageView(Context context,AttributeSet attr){
-        this(context,attr,0);
+    public ScaleImageView(Context context, AttributeSet attr) {
+        this(context, attr, 0);
     }
 
-    public ScaleImageView(Context context){
-        this(context,null);
+    public ScaleImageView(Context context) {
+        this(context, null);
     }
 
 
-    public static Bitmap.Config getPreferredBitmapConfig(){
+    public static Bitmap.Config getPreferredBitmapConfig() {
         return preferredBitmapConfig;
     }
 
-    public static void setPreferredBitmapConfig(Bitmap.Config preferredBitmapConfig){
-        ScaleImageView.preferredBitmapConfig=preferredBitmapConfig;
+    public static void setPreferredBitmapConfig(Bitmap.Config preferredBitmapConfig) {
+        ScaleImageView.preferredBitmapConfig = preferredBitmapConfig;
     }
 
-    public final void setOrientation(int orientation){
-        if(!VALID_ORIENTATIONS.contains(orientation)){
-            throw new IllegalArgumentException("Invalid orientation: "+orientation);
+
+    public final void setOrientation(int orientation) {
+        if (!VALID_ORIENTATIONS.contains(orientation)) {
+            throw new IllegalArgumentException("Invalid orientation: " + orientation);
         }
-        this.orientation=orientation;
+        this.orientation = orientation;
         reset(false);
         invalidate();
         requestLayout();
     }
 
-    public final void setImage(@NonNull ImageSource imageSource){
-        setImage(imageSource,null,null);
+    public final void setImage(@NonNull ImageSource imageSource) {
+        setImage(imageSource, null, null);
     }
 
-    public final void setImage(@NonNull ImageSource imageSource,ImageViewState state){
-        setImage(imageSource,null,state);
+    public final void setImage(@NonNull ImageSource imageSource, ImageViewState state) {
+        setImage(imageSource, null, state);
     }
 
-    public final void setImage(@NonNull ImageSource imageSource,ImageSource previewSource){
-        setImage(imageSource,previewSource,null);
+    public final void setImage(@NonNull ImageSource imageSource, ImageSource previewSource) {
+        setImage(imageSource, previewSource, null);
     }
 
-    public final void setImage(@NonNull ImageSource imageSource,ImageSource previewSource,ImageViewState state){
+    public final void setImage(@NonNull ImageSource imageSource, ImageSource previewSource, ImageViewState state) {
         //noinspection ConstantConditions
-        if(imageSource==null){
+        if (imageSource == null) {
             throw new NullPointerException("imageSource must not be null");
         }
 
         reset(true);
-        if(state!=null){ restoreState(state); }
+        if (state != null) {
+            restoreState(state);
+        }
 
-        if(previewSource!=null){
-            if(imageSource.getBitmap()!=null){
+        if (previewSource != null) {
+            if (imageSource.getBitmap() != null) {
                 throw new IllegalArgumentException(
                         "Preview image cannot be used when a bitmap is provided for the main image");
             }
-            if(imageSource.getSWidth()<=0||imageSource.getSHeight()<=0){
+            if (imageSource.getSWidth() <= 0 || imageSource.getSHeight() <= 0) {
                 throw new IllegalArgumentException(
                         "Preview image cannot be used unless dimensions are provided for the main image");
             }
-            this.sWidth=imageSource.getSWidth();
-            this.sHeight=imageSource.getSHeight();
-            this.pRegion=previewSource.getSRegion();
-            if(previewSource.getBitmap()!=null){
-                this.bitmapIsCached=previewSource.isCached();
+            this.sWidth = imageSource.getSWidth();
+            this.sHeight = imageSource.getSHeight();
+            this.pRegion = previewSource.getSRegion();
+            if (previewSource.getBitmap() != null) {
+                this.bitmapIsCached = previewSource.isCached();
                 onPreviewLoaded(previewSource.getBitmap());
-            } else{
-                Uri uri=previewSource.getUri();
-                if(uri==null&&previewSource.getResource()!=null){
-                    uri=Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE+"://"+getContext().getPackageName()+"/"+
-                                  previewSource.getResource());
+            } else {
+                Uri uri = previewSource.getUri();
+                if (uri == null && previewSource.getResource() != null) {
+                    uri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + getContext().getPackageName() + "/" +
+                            previewSource.getResource());
                 }
-                BitmapLoadTask task=new BitmapLoadTask(this,getContext(),bitmapDecoderFactory,uri,true);
+                BitmapLoadTask task = new BitmapLoadTask(this, getContext(), bitmapDecoderFactory, uri, true);
                 execute(task);
             }
         }
 
-        if(imageSource.getBitmap()!=null&&imageSource.getSRegion()!=null){
+        if (imageSource.getBitmap() != null && imageSource.getSRegion() != null) {
             onImageLoaded(Bitmap.createBitmap(imageSource.getBitmap(),
-                                              imageSource.getSRegion().left,
-                                              imageSource.getSRegion().top,
-                                              imageSource.getSRegion().width(),
-                                              imageSource.getSRegion().height()),ORIENTATION_0,false);
-        } else if(imageSource.getBitmap()!=null){
-            onImageLoaded(imageSource.getBitmap(),ORIENTATION_0,imageSource.isCached());
-        } else{
-            sRegion=imageSource.getSRegion();
-            uri=imageSource.getUri();
-            if(uri==null&&imageSource.getResource()!=null){
-                uri=Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE+"://"+getContext().getPackageName()+"/"+
-                              imageSource.getResource());
+                    imageSource.getSRegion().left,
+                    imageSource.getSRegion().top,
+                    imageSource.getSRegion().width(),
+                    imageSource.getSRegion().height()), ORIENTATION_0, false);
+        } else if (imageSource.getBitmap() != null) {
+            onImageLoaded(imageSource.getBitmap(), ORIENTATION_0, imageSource.isCached());
+        } else {
+            sRegion = imageSource.getSRegion();
+            uri = imageSource.getUri();
+            if (uri == null && imageSource.getResource() != null) {
+                uri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + getContext().getPackageName() + "/" +
+                        imageSource.getResource());
             }
-            if(imageSource.getTile()||sRegion!=null){
+            if (imageSource.getTile() || sRegion != null) {
                 // Load the bitmap using tile decoding.
-                TilesInitTask task=new TilesInitTask(this,getContext(),regionDecoderFactory,uri);
+                TilesInitTask task = new TilesInitTask(this, getContext(), regionDecoderFactory, uri);
                 execute(task);
-            } else{
+            } else {
                 // Load the bitmap as a single image.
-                BitmapLoadTask task=new BitmapLoadTask(this,getContext(),bitmapDecoderFactory,uri,false);
+                BitmapLoadTask task = new BitmapLoadTask(this, getContext(), bitmapDecoderFactory, uri, false);
                 execute(task);
             }
         }
     }
 
-    protected void reset(boolean newImage){
-        debug("reset newImage="+newImage);
-        scale=0f;
-        scaleStart=0f;
-        vTranslate=null;
-        vTranslateStart=null;
-        vTranslateBefore=null;
-        pendingScale=0f;
-        sPendingCenter=null;
-        sRequestedCenter=null;
-        isZooming=false;
-        isPanning=false;
-        isQuickScaling=false;
-        maxTouchCount=0;
-        fullImageSampleSize=0;
-        vCenterStart=null;
-        vDistStart=0;
-        quickScaleLastDistance=0f;
-        quickScaleMoved=false;
-        quickScaleSCenter=null;
-        quickScaleVLastPoint=null;
-        quickScaleVStart=null;
-        anim=null;
-        satTemp=null;
-        matrix=null;
-        sRect=null;
-        if(newImage){
-            uri=null;
+    protected void reset(boolean newImage) {
+        debug("reset newImage=" + newImage);
+        scale = 0f;
+        scaleStart = 0f;
+        vTranslate = null;
+        vTranslateStart = null;
+        vTranslateBefore = null;
+        pendingScale = 0f;
+        sPendingCenter = null;
+        sRequestedCenter = null;
+        isZooming = false;
+        isPanning = false;
+        isQuickScaling = false;
+        maxTouchCount = 0;
+        fullImageSampleSize = 0;
+        vCenterStart = null;
+        vDistStart = 0;
+        quickScaleLastDistance = 0f;
+        quickScaleMoved = false;
+        quickScaleSCenter = null;
+        quickScaleVLastPoint = null;
+        quickScaleVStart = null;
+        anim = null;
+        satTemp = null;
+        matrix = null;
+        sRect = null;
+        if (newImage) {
+            uri = null;
             decoderLock.writeLock().lock();
-            try{
-                if(decoder!=null){
+            try {
+                if (decoder != null) {
                     decoder.recycle();
-                    decoder=null;
+                    decoder = null;
                 }
-            } finally{
+            } finally {
                 decoderLock.writeLock().unlock();
             }
-            if(bitmap!=null&&!bitmapIsCached){
+            if (bitmap != null && !bitmapIsCached) {
                 bitmap.recycle();
             }
-            if(bitmap!=null&&bitmapIsCached&&onImageEventListener!=null){
+            if (bitmap != null && bitmapIsCached && onImageEventListener != null) {
                 onImageEventListener.onPreviewReleased();
             }
             sWidth=0;
@@ -478,34 +482,33 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
                     tile.visible=false;
                     if(tile.bitmap!=null){
                         tile.bitmap.recycle();
-                        tile.bitmap=null;
+                        tile.bitmap = null;
                     }
                 }
             }
-            tileMap=null;
+            tileMap = null;
         }
         setGestureDetector(getContext());
     }
 
-    protected void setGestureDetector(final Context context){
-        if(detector==null){
-            this.detector=new GestureDetector(context,new GestureDetector.SimpleOnGestureListener(){
+    protected void setGestureDetector(final Context context) {
+        if (detector == null) {
+            this.detector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
                 @Override
-                public boolean onFling(MotionEvent e1,MotionEvent e2,float velocityX,float velocityY){
-                    if(panEnabled&&readySent&&vTranslate!=null&&e1!=null&&e2!=null&&(Math.abs(e1.getX()-e2.getX())>50||
-                                                                                     Math.abs(e1.getY()-e2.getY())>50)&&
-                       (Math.abs(velocityX)>500||Math.abs(velocityY)>500)&&!isZooming)
-                    {
-                        PointF vTranslateEnd=new PointF(vTranslate.x+(velocityX*0.25f),vTranslate.y+(velocityY*0.25f));
-                        float sCenterXEnd=((getWidth()/2)-vTranslateEnd.x)/scale;
-                        float sCenterYEnd=((getHeight()/2)-vTranslateEnd.y)/scale;
-                        new AnimationBuilder(new PointF(sCenterXEnd,sCenterYEnd)).withEasing(EASE_OUT_QUAD)
-                                                                                 .withPanLimited(false)
-                                                                                 .withOrigin(ORIGIN_FLING)
-                                                                                 .start();
+                public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                    if (panEnabled && readySent && vTranslate != null && e1 != null && e2 != null && (Math.abs(e1.getX() - e2.getX()) > 50 ||
+                            Math.abs(e1.getY() - e2.getY()) > 50) &&
+                            (Math.abs(velocityX) > 500 || Math.abs(velocityY) > 500) && !isZooming) {
+                        PointF vTranslateEnd = new PointF(vTranslate.x + (velocityX * 0.25f), vTranslate.y + (velocityY * 0.25f));
+                        float sCenterXEnd = ((getWidth() / 2) - vTranslateEnd.x) / scale;
+                        float sCenterYEnd = ((getHeight() / 2) - vTranslateEnd.y) / scale;
+                        new AnimationBuilder(new PointF(sCenterXEnd, sCenterYEnd)).withEasing(EASE_OUT_QUAD)
+                                .withPanLimited(false)
+                                .withOrigin(ORIGIN_FLING)
+                                .start();
                         return true;
                     }
-                    return super.onFling(e1,e2,velocityX,velocityY);
+                    return super.onFling(e1, e2, velocityX, velocityY);
                 }
 
                 @Override
@@ -590,8 +593,8 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
                 }
 
                 @Override
-                public boolean onDoubleTapEvent(MotionEvent e){
-                    if(onDoubleTapListener!=null){
+                public boolean onDoubleTapEvent(MotionEvent e) {
+                    if (onDoubleTapListener != null) {
                         return onDoubleTapListener.onDoubleTapEvent(e);
                     }
                     return super.onDoubleTapEvent(e);
@@ -601,107 +604,113 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
     }
 
     @Override
-    protected void onSizeChanged(int w,int h,int oldw,int oldh){
-        debug("onSizeChanged %dx%d -> %dx%d",oldw,oldh,w,h);
-        PointF sCenter=getCenter();
-        if(readySent&&sCenter!=null){
-            this.anim=null;
-            this.pendingScale=scale;
-            this.sPendingCenter=sCenter;
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        debug("onSizeChanged %dx%d -> %dx%d", oldw, oldh, w, h);
+        PointF sCenter = getCenter();
+        if (readySent && sCenter != null) {
+            this.anim = null;
+            this.pendingScale = scale;
+            this.sPendingCenter = sCenter;
         }
     }
 
     @Override
-    protected void onMeasure(int widthMeasureSpec,int heightMeasureSpec){
-        int widthSpecMode=MeasureSpec.getMode(widthMeasureSpec);
-        int heightSpecMode=MeasureSpec.getMode(heightMeasureSpec);
-        int parentWidth=MeasureSpec.getSize(widthMeasureSpec);
-        int parentHeight=MeasureSpec.getSize(heightMeasureSpec);
-        boolean resizeWidth=widthSpecMode!=MeasureSpec.EXACTLY;
-        boolean resizeHeight=heightSpecMode!=MeasureSpec.EXACTLY;
-        int width=parentWidth;
-        int height=parentHeight;
-        if(sWidth>0&&sHeight>0){
-            if(resizeWidth&&resizeHeight){
-                width=sWidth();
-                height=sHeight();
-            } else if(resizeHeight){
-                height=(int)((((double)sHeight()/(double)sWidth())*width));
-            } else if(resizeWidth){
-                width=(int)((((double)sWidth()/(double)sHeight())*height));
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int widthSpecMode = MeasureSpec.getMode(widthMeasureSpec);
+        int heightSpecMode = MeasureSpec.getMode(heightMeasureSpec);
+        int parentWidth = MeasureSpec.getSize(widthMeasureSpec);
+        int parentHeight = MeasureSpec.getSize(heightMeasureSpec);
+        boolean resizeWidth = widthSpecMode != MeasureSpec.EXACTLY;
+        boolean resizeHeight = heightSpecMode != MeasureSpec.EXACTLY;
+        int width = parentWidth;
+        int height = parentHeight;
+        if (sWidth > 0 && sHeight > 0) {
+            if (resizeWidth && resizeHeight) {
+                width = sWidth();
+                height = sHeight();
+            } else if (resizeHeight) {
+                height = (int) ((((double) sHeight() / (double) sWidth()) * width));
+            } else if (resizeWidth) {
+                width = (int) ((((double) sWidth() / (double) sHeight()) * height));
             }
         }
-        width=Math.max(width,getSuggestedMinimumWidth());
-        height=Math.max(height,getSuggestedMinimumHeight());
-        setMeasuredDimension(width,height);
+        width = Math.max(width, getSuggestedMinimumWidth());
+        height = Math.max(height, getSuggestedMinimumHeight());
+        setMeasuredDimension(width, height);
     }
 
     @Override
-    public boolean onTouchEvent(@NonNull MotionEvent event){
+    public boolean onTouchEvent(@NonNull MotionEvent event) {
         // During non-interruptible anims, ignore all touch events
-        if(anim!=null&&!anim.interruptible){
+        if (anim != null && !anim.interruptible) {
             requestDisallowInterceptTouchEvent(true);
             return true;
-        } else{
-            if(anim!=null&&anim.listener!=null){
-                try{
+        } else {
+            if (anim != null && anim.listener != null) {
+                try {
                     anim.listener.onInterruptedByUser();
-                } catch(Exception e){
-                    Log.w(TAG,"Error thrown by animation listener",e);
+                } catch (Exception e) {
+                    Log.w(TAG, "Error thrown by animation listener", e);
                 }
             }
-            anim=null;
+            anim = null;
         }
 
         // Abort if not ready
-        if(vTranslate==null){
-            if(singleDetector!=null){
+        if (vTranslate == null) {
+            if (singleDetector != null) {
                 singleDetector.onTouchEvent(event);
             }
             return true;
         }
         // Detect flings, taps and double taps
-        if(!isQuickScaling&&(detector==null||detector.onTouchEvent(event))){
-            isZooming=false;
-            isPanning=false;
-            maxTouchCount=0;
+        if (!isQuickScaling && (detector == null || detector.onTouchEvent(event))) {
+            isZooming = false;
+            isPanning = false;
+            maxTouchCount = 0;
             return true;
         }
 
-        if(vTranslateStart==null){ vTranslateStart=new PointF(0,0); }
-        if(vTranslateBefore==null){ vTranslateBefore=new PointF(0,0); }
-        if(vCenterStart==null){ vCenterStart=new PointF(0,0); }
+        if (vTranslateStart == null) {
+            vTranslateStart = new PointF(0, 0);
+        }
+        if (vTranslateBefore == null) {
+            vTranslateBefore = new PointF(0, 0);
+        }
+        if (vCenterStart == null) {
+            vCenterStart = new PointF(0, 0);
+        }
 
         // Store current values so we can send an event if they change
-        float scaleBefore=scale;
+        float scaleBefore = scale;
         vTranslateBefore.set(vTranslate);
 
-        boolean handled=onTouchEventInternal(event);
-        sendStateChanged(scaleBefore,vTranslateBefore,ORIGIN_TOUCH);
-        return handled||super.onTouchEvent(event);
+        boolean handled = onTouchEventInternal(event);
+        sendStateChanged(scaleBefore, vTranslateBefore, ORIGIN_TOUCH);
+        return handled || super.onTouchEvent(event);
     }
 
     @SuppressWarnings("deprecation")
-    protected boolean onTouchEventInternal(@NonNull MotionEvent event){
-        int touchCount=event.getPointerCount();
-        switch(event.getAction()){
+    protected boolean onTouchEventInternal(@NonNull MotionEvent event) {
+        int touchCount = event.getPointerCount();
+        switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_1_DOWN:
             case MotionEvent.ACTION_POINTER_2_DOWN:
-                anim=null;
+                anim = null;
                 requestDisallowInterceptTouchEvent(true);
-                maxTouchCount=Math.max(maxTouchCount,touchCount);
-                if(touchCount >= 2){
-                    if(zoomEnabled){
+                maxTouchCount = Math.max(maxTouchCount, touchCount);
+                if (touchCount >= 2) {
+                    if (zoomEnabled) {
                         // Start pinch to zoom. Calculate distance between touch points and center point of the pinch.
-                        float distance=distance(event.getX(0),event.getX(1),event.getY(0),event.getY(1));
-                        scaleStart=scale;
-                        vDistStart=distance;
-                        vTranslateStart.set(vTranslate.x,vTranslate.y);
-                        vCenterStart.set((event.getX(0)+event.getX(1))/2,(event.getY(0)+event.getY(1))/2);
-                    } else{
+                        float distance = distance(event.getX(0), event.getX(1), event.getY(0), event.getY(1));
+                        scaleStart = scale;
+                        vDistStart = distance;
+                        vTranslateStart.set(vTranslate.x, vTranslate.y);
+                        vCenterStart.set((event.getX(0) + event.getX(1)) / 2, (event.getY(0) + event.getY(1)) / 2);
+                    } else {
                         // Abort all gestures on second touch
-                        maxTouchCount=0;
+                        maxTouchCount = 0;
                     }
                     // Cancel long click timer
                     handler.removeMessages(MESSAGE_LONG_CLICK);
@@ -883,96 +892,95 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
                     }
                 }
                 if(maxTouchCount>0&&(isZooming||isPanning)){
-                    if(isZooming&&touchCount==2){
+                    if (isZooming && touchCount == 2) {
                         // Convert from zoom to pan with remaining touch
-                        isPanning=true;
-                        vTranslateStart.set(vTranslate.x,vTranslate.y);
-                        if(event.getActionIndex()==1){
-                            vCenterStart.set(event.getX(0),event.getY(0));
-                        } else{
-                            vCenterStart.set(event.getX(1),event.getY(1));
+                        isPanning = true;
+                        vTranslateStart.set(vTranslate.x, vTranslate.y);
+                        if (event.getActionIndex() == 1) {
+                            vCenterStart.set(event.getX(0), event.getY(0));
+                        } else {
+                            vCenterStart.set(event.getX(1), event.getY(1));
                         }
                     }
-                    if(touchCount<3){
+                    if (touchCount < 3) {
                         // End zooming when only one touch point
-                        isZooming=false;
+                        isZooming = false;
                     }
-                    if(touchCount<2){
+                    if (touchCount < 2) {
                         // End panning when no touch points
-                        isPanning=false;
-                        maxTouchCount=0;
+                        isPanning = false;
+                        maxTouchCount = 0;
                     }
                     // Trigger load of tiles now required
                     refreshRequiredTiles(true);
                     return true;
                 }
-                if(touchCount==1){
-                    isZooming=false;
-                    isPanning=false;
-                    maxTouchCount=0;
+                if (touchCount == 1) {
+                    isZooming = false;
+                    isPanning = false;
+                    maxTouchCount = 0;
                 }
                 return true;
         }
         return false;
     }
 
-    protected void requestDisallowInterceptTouchEvent(boolean disallowIntercept){
-        ViewParent parent=getParent();
-        if(parent!=null){
+    protected void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
+        ViewParent parent = getParent();
+        if (parent != null) {
             parent.requestDisallowInterceptTouchEvent(disallowIntercept);
         }
     }
 
-    protected void doubleTapZoom(PointF sCenter,PointF vFocus){
-        if(!panEnabled){
-            if(sRequestedCenter!=null){
+    protected void doubleTapZoom(PointF sCenter, PointF vFocus) {
+        if (!panEnabled) {
+            if (sRequestedCenter != null) {
                 // With a center specified from code, zoom around that point.
-                sCenter.x=sRequestedCenter.x;
-                sCenter.y=sRequestedCenter.y;
-            } else{
+                sCenter.x = sRequestedCenter.x;
+                sCenter.y = sRequestedCenter.y;
+            } else {
                 // With no requested center, scale around the image center.
-                sCenter.x=sWidth()/2;
-                sCenter.y=sHeight()/2;
+                sCenter.x = sWidth() / 2;
+                sCenter.y = sHeight() / 2;
             }
         }
         //双击缩放
-        float doubleTapZoomScale=Math.min(maxScale,ScaleImageView.this.doubleTapZoomScale);
+        float doubleTapZoomScale = Math.min(maxScale, ScaleImageView.this.doubleTapZoomScale);
 //        boolean zoomIn=(scale<=doubleTapZoomScale*0.9)||scale==minScale;
         //改!如果已经缩放过了,再次双击则缩小
-        boolean zoomIn=scale<=minScale()*1.2;
+        boolean zoomIn = scale <= minScale() * 1.2;
 
-        float targetScale=zoomIn ? doubleTapZoomScale : minScale();
-        if(doubleTapZoomStyle==ZOOM_FOCUS_CENTER_IMMEDIATE){
-            setScaleAndCenter(targetScale,sCenter);
-        } else if(doubleTapZoomStyle==ZOOM_FOCUS_CENTER||!zoomIn||!panEnabled){
-            new AnimationBuilder(targetScale,sCenter).withInterruptible(false)
-                                                     .withDuration(doubleTapZoomDuration)
-                                                     .withOrigin(ORIGIN_DOUBLE_TAP_ZOOM)
-                                                     .start();
-        } else if(doubleTapZoomStyle==ZOOM_FOCUS_FIXED){
-            new AnimationBuilder(targetScale,sCenter,vFocus).withInterruptible(false)
-                                                            .withDuration(doubleTapZoomDuration)
-                                                            .withOrigin(ORIGIN_DOUBLE_TAP_ZOOM)
-                                                            .start();
+        float targetScale = zoomIn ? doubleTapZoomScale : minScale();
+        if (doubleTapZoomStyle == ZOOM_FOCUS_CENTER_IMMEDIATE) {
+            setScaleAndCenter(targetScale, sCenter);
+        } else if (doubleTapZoomStyle == ZOOM_FOCUS_CENTER || !zoomIn || !panEnabled) {
+            new AnimationBuilder(targetScale, sCenter).withInterruptible(false)
+                    .withDuration(doubleTapZoomDuration)
+                    .withOrigin(ORIGIN_DOUBLE_TAP_ZOOM)
+                    .start();
+        } else if (doubleTapZoomStyle == ZOOM_FOCUS_FIXED) {
+            new AnimationBuilder(targetScale, sCenter, vFocus).withInterruptible(false)
+                    .withDuration(doubleTapZoomDuration)
+                    .withOrigin(ORIGIN_DOUBLE_TAP_ZOOM)
+                    .start();
         }
         invalidate();
     }
 
-
     @Override
-    protected void onDraw(Canvas canvas){
-        if(isCallSuperOnDraw){
+    protected void onDraw(Canvas canvas) {
+        if (isCallSuperOnDraw) {
             super.onDraw(canvas);
-        } else{
+        } else {
             createPaints();
 
             // If image or view dimensions are not known yet, abort.
-            if(sWidth==0||sHeight==0||getWidth()==0||getHeight()==0){
+            if (sWidth == 0 || sHeight == 0 || getWidth() == 0 || getHeight() == 0) {
                 return;
             }
 
             // When using tiles, on first render with no tile map ready, initialise it and kick off async base image loading.
-            if(tileMap==null&&decoder!=null){
+            if (tileMap == null && decoder != null) {
                 initialiseBaseLayer(getMaxBitmapDimensions(canvas));
             }
 
@@ -1177,30 +1185,30 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
                     PointF vCenterEndRequested=sourceToViewCoord(anim.sCenterEndRequested);
                     PointF vCenterEnd=sourceToViewCoord(anim.sCenterEnd);
                     //noinspection ConstantConditions
-                    canvas.drawCircle(vCenterStart.x,vCenterStart.y,px(10),debugLinePaint);
+                    canvas.drawCircle(vCenterStart.x, vCenterStart.y, px(10), debugLinePaint);
                     debugLinePaint.setColor(Color.RED);
                     //noinspection ConstantConditions
-                    canvas.drawCircle(vCenterEndRequested.x,vCenterEndRequested.y,px(20),debugLinePaint);
+                    canvas.drawCircle(vCenterEndRequested.x, vCenterEndRequested.y, px(20), debugLinePaint);
                     debugLinePaint.setColor(Color.BLUE);
                     //noinspection ConstantConditions
-                    canvas.drawCircle(vCenterEnd.x,vCenterEnd.y,px(25),debugLinePaint);
+                    canvas.drawCircle(vCenterEnd.x, vCenterEnd.y, px(25), debugLinePaint);
                     debugLinePaint.setColor(Color.CYAN);
-                    canvas.drawCircle(getWidth()/2,getHeight()/2,px(30),debugLinePaint);
+                    canvas.drawCircle(getWidth() / 2, getHeight() / 2, px(30), debugLinePaint);
                 }
-                if(vCenterStart!=null){
+                if (vCenterStart != null) {
                     debugLinePaint.setColor(Color.RED);
-                    canvas.drawCircle(vCenterStart.x,vCenterStart.y,px(20),debugLinePaint);
+                    canvas.drawCircle(vCenterStart.x, vCenterStart.y, px(20), debugLinePaint);
                 }
-                if(quickScaleSCenter!=null){
+                if (quickScaleSCenter != null) {
                     debugLinePaint.setColor(Color.BLUE);
                     canvas.drawCircle(sourceToViewX(quickScaleSCenter.x),
-                                      sourceToViewY(quickScaleSCenter.y),
-                                      px(35),
-                                      debugLinePaint);
+                            sourceToViewY(quickScaleSCenter.y),
+                            px(35),
+                            debugLinePaint);
                 }
-                if(quickScaleVStart!=null&&isQuickScaling){
+                if (quickScaleVStart != null && isQuickScaling) {
                     debugLinePaint.setColor(Color.CYAN);
-                    canvas.drawCircle(quickScaleVStart.x,quickScaleVStart.y,px(30),debugLinePaint);
+                    canvas.drawCircle(quickScaleVStart.x, quickScaleVStart.y, px(30), debugLinePaint);
                 }
                 debugLinePaint.setColor(Color.MAGENTA);
             }
@@ -1208,28 +1216,27 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
     }
 
     protected void setMatrixArray(
-            float[] array,float f0,float f1,float f2,float f3,float f4,float f5,float f6,float f7)
-    {
-        array[0]=f0;
-        array[1]=f1;
-        array[2]=f2;
-        array[3]=f3;
-        array[4]=f4;
-        array[5]=f5;
-        array[6]=f6;
-        array[7]=f7;
+            float[] array, float f0, float f1, float f2, float f3, float f4, float f5, float f6, float f7) {
+        array[0] = f0;
+        array[1] = f1;
+        array[2] = f2;
+        array[3] = f3;
+        array[4] = f4;
+        array[5] = f5;
+        array[6] = f6;
+        array[7] = f7;
     }
 
-    protected boolean isBaseLayerReady(){
-        if(bitmap!=null&&!bitmapIsPreview){
+    protected boolean isBaseLayerReady() {
+        if (bitmap != null && !bitmapIsPreview) {
             return true;
-        } else if(tileMap!=null){
-            boolean baseLayerReady=true;
-            for(Map.Entry<Integer,List<Tile>> tileMapEntry: tileMap.entrySet()){
-                if(tileMapEntry.getKey()==fullImageSampleSize){
-                    for(Tile tile: tileMapEntry.getValue()){
-                        if(tile.loading||tile.bitmap==null){
-                            baseLayerReady=false;
+        } else if (tileMap != null) {
+            boolean baseLayerReady = true;
+            for (Map.Entry<Integer, List<Tile>> tileMapEntry : tileMap.entrySet()) {
+                if (tileMapEntry.getKey() == fullImageSampleSize) {
+                    for (Tile tile : tileMapEntry.getValue()) {
+                        if (tile.loading || tile.bitmap == null) {
+                            baseLayerReady = false;
                         }
                     }
                 }
@@ -1239,80 +1246,80 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
         return false;
     }
 
-    protected boolean checkReady(){
-        boolean ready=getWidth()>0&&getHeight()>0&&sWidth>0&&sHeight>0&&(bitmap!=null||isBaseLayerReady());
-        if(!readySent&&ready){
+    protected boolean checkReady() {
+        boolean ready = getWidth() > 0 && getHeight() > 0 && sWidth > 0 && sHeight > 0 && (bitmap != null || isBaseLayerReady());
+        if (!readySent && ready) {
             preDraw();
-            readySent=true;
+            readySent = true;
             onReady();
-            if(onImageEventListener!=null){
+            if (onImageEventListener != null) {
                 onImageEventListener.onReady();
             }
         }
         return ready;
     }
 
-    protected boolean checkImageLoaded(){
-        boolean imageLoaded=isBaseLayerReady();
-        if(!imageLoadedSent&&imageLoaded){
+    protected boolean checkImageLoaded() {
+        boolean imageLoaded = isBaseLayerReady();
+        if (!imageLoadedSent && imageLoaded) {
             preDraw();
-            imageLoadedSent=true;
+            imageLoadedSent = true;
             onImageLoaded();
-            if(onImageEventListener!=null){
+            if (onImageEventListener != null) {
                 onImageEventListener.onImageLoaded();
             }
         }
         return imageLoaded;
     }
 
-    protected void createPaints(){
-        if(bitmapPaint==null){
-            bitmapPaint=new Paint();
+    protected void createPaints() {
+        if (bitmapPaint == null) {
+            bitmapPaint = new Paint();
             bitmapPaint.setAntiAlias(true);
             bitmapPaint.setFilterBitmap(true);
             bitmapPaint.setDither(true);
         }
-        if((debugTextPaint==null||debugLinePaint==null)&&debug){
-            debugTextPaint=new Paint();
+        if ((debugTextPaint == null || debugLinePaint == null) && debug) {
+            debugTextPaint = new Paint();
             debugTextPaint.setTextSize(px(12));
             debugTextPaint.setColor(Color.MAGENTA);
             debugTextPaint.setStyle(Style.FILL);
-            debugLinePaint=new Paint();
+            debugLinePaint = new Paint();
             debugLinePaint.setColor(Color.MAGENTA);
             debugLinePaint.setStyle(Style.STROKE);
             debugLinePaint.setStrokeWidth(px(1));
         }
     }
 
-    protected synchronized void initialiseBaseLayer(@NonNull Point maxTileDimensions){
-        debug("initialiseBaseLayer maxTileDimensions=%dx%d",maxTileDimensions.x,maxTileDimensions.y);
+    protected synchronized void initialiseBaseLayer(@NonNull Point maxTileDimensions) {
+        debug("initialiseBaseLayer maxTileDimensions=%dx%d", maxTileDimensions.x, maxTileDimensions.y);
 
-        satTemp=new ScaleAndTranslate(0f,new PointF(0,0));
-        fitToBounds(true,satTemp);
+        satTemp = new ScaleAndTranslate(0f, new PointF(0, 0));
+        fitToBounds(true, satTemp);
 
         // Load double resolution - next level will be split into four tiles and at the center all four are required,
         // so don't bother with tiling until the next level 16 tiles are needed.
-        fullImageSampleSize=calculateInSampleSize(satTemp.scale);
-        if(fullImageSampleSize>1){
-            fullImageSampleSize/=2;
+        fullImageSampleSize = calculateInSampleSize(satTemp.scale);
+        if (fullImageSampleSize > 1) {
+            fullImageSampleSize /= 2;
         }
 
-        if(fullImageSampleSize==1&&sRegion==null&&sWidth()<maxTileDimensions.x&&sHeight()<maxTileDimensions.y){
+        if (fullImageSampleSize == 1 && sRegion == null && sWidth() < maxTileDimensions.x && sHeight() < maxTileDimensions.y) {
 
             // Whole image is required at native resolution, and is smaller than the canvas max bitmap size.
             // Use BitmapDecoder for better image support.
             decoder.recycle();
-            decoder=null;
-            BitmapLoadTask task=new BitmapLoadTask(this,getContext(),bitmapDecoderFactory,uri,false);
+            decoder = null;
+            BitmapLoadTask task = new BitmapLoadTask(this, getContext(), bitmapDecoderFactory, uri, false);
             execute(task);
 
-        } else{
+        } else {
 
             initialiseTileMap(maxTileDimensions);
 
-            List<Tile> baseGrid=tileMap.get(fullImageSampleSize);
-            for(Tile baseTile: baseGrid){
-                TileLoadTask task=new TileLoadTask(this,decoder,baseTile);
+            List<Tile> baseGrid = tileMap.get(fullImageSampleSize);
+            for (Tile baseTile : baseGrid) {
+                TileLoadTask task = new TileLoadTask(this, decoder, baseTile);
                 execute(task);
             }
             refreshRequiredTiles(true);
@@ -1321,66 +1328,68 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
 
     }
 
-    protected void refreshRequiredTiles(boolean load){
-        if(decoder==null||tileMap==null){ return; }
+    protected void refreshRequiredTiles(boolean load) {
+        if (decoder == null || tileMap == null) {
+            return;
+        }
 
-        int sampleSize=Math.min(fullImageSampleSize,calculateInSampleSize(scale));
+        int sampleSize = Math.min(fullImageSampleSize, calculateInSampleSize(scale));
 
         // Load tiles of the correct sample size that are on screen. Discard tiles off screen, and those that are higher
         // resolution than required, or lower res than required but not the base layer, so the base layer is always present.
-        for(Map.Entry<Integer,List<Tile>> tileMapEntry: tileMap.entrySet()){
-            for(Tile tile: tileMapEntry.getValue()){
-                if(tile.sampleSize<sampleSize||(tile.sampleSize>sampleSize&&tile.sampleSize!=fullImageSampleSize)){
-                    tile.visible=false;
-                    if(tile.bitmap!=null){
+        for (Map.Entry<Integer, List<Tile>> tileMapEntry : tileMap.entrySet()) {
+            for (Tile tile : tileMapEntry.getValue()) {
+                if (tile.sampleSize < sampleSize || (tile.sampleSize > sampleSize && tile.sampleSize != fullImageSampleSize)) {
+                    tile.visible = false;
+                    if (tile.bitmap != null) {
                         tile.bitmap.recycle();
-                        tile.bitmap=null;
+                        tile.bitmap = null;
                     }
                 }
-                if(tile.sampleSize==sampleSize){
-                    if(tileVisible(tile)){
-                        tile.visible=true;
-                        if(!tile.loading&&tile.bitmap==null&&load){
-                            TileLoadTask task=new TileLoadTask(this,decoder,tile);
+                if (tile.sampleSize == sampleSize) {
+                    if (tileVisible(tile)) {
+                        tile.visible = true;
+                        if (!tile.loading && tile.bitmap == null && load) {
+                            TileLoadTask task = new TileLoadTask(this, decoder, tile);
                             execute(task);
                         }
-                    } else if(tile.sampleSize!=fullImageSampleSize){
-                        tile.visible=false;
-                        if(tile.bitmap!=null){
+                    } else if (tile.sampleSize != fullImageSampleSize) {
+                        tile.visible = false;
+                        if (tile.bitmap != null) {
                             tile.bitmap.recycle();
-                            tile.bitmap=null;
+                            tile.bitmap = null;
                         }
                     }
-                } else if(tile.sampleSize==fullImageSampleSize){
-                    tile.visible=true;
+                } else if (tile.sampleSize == fullImageSampleSize) {
+                    tile.visible = true;
                 }
             }
         }
 
     }
 
-    protected boolean tileVisible(Tile tile){
-        float sVisLeft=viewToSourceX(0), sVisRight=viewToSourceX(getWidth()), sVisTop=viewToSourceY(0), sVisBottom=
+    protected boolean tileVisible(Tile tile) {
+        float sVisLeft = viewToSourceX(0), sVisRight = viewToSourceX(getWidth()), sVisTop = viewToSourceY(0), sVisBottom =
                 viewToSourceY(getHeight());
-        return !(sVisLeft>tile.sRect.right||tile.sRect.left>sVisRight||sVisTop>tile.sRect.bottom||
-                 tile.sRect.top>sVisBottom);
+        return !(sVisLeft > tile.sRect.right || tile.sRect.left > sVisRight || sVisTop > tile.sRect.bottom ||
+                tile.sRect.top > sVisBottom);
     }
 
-    protected void preDraw(){
-        if(getWidth()==0||getHeight()==0||sWidth<=0||sHeight<=0){
+    protected void preDraw() {
+        if (getWidth() == 0 || getHeight() == 0 || sWidth <= 0 || sHeight <= 0) {
             return;
         }
 
         // If waiting to translate to new center position, set translate now
-        if(sPendingCenter!=null&&pendingScale!=null){
-            scale=pendingScale;
-            if(vTranslate==null){
-                vTranslate=new PointF();
+        if (sPendingCenter != null && pendingScale != null) {
+            scale = pendingScale;
+            if (vTranslate == null) {
+                vTranslate = new PointF();
             }
-            vTranslate.x=(getWidth()/2)-(scale*sPendingCenter.x);
-            vTranslate.y=(getHeight()/2)-(scale*sPendingCenter.y);
-            sPendingCenter=null;
-            pendingScale=null;
+            vTranslate.x = (getWidth() / 2) - (scale * sPendingCenter.x);
+            vTranslate.y = (getHeight() / 2) - (scale * sPendingCenter.y);
+            sPendingCenter = null;
+            pendingScale = null;
             fitToBounds(true);
             refreshRequiredTiles(true);
         }
@@ -1389,588 +1398,387 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
         fitToBounds(false);
     }
 
-    protected int calculateInSampleSize(float scale){
-        if(minimumTileDpi>0){
-            DisplayMetrics metrics=getResources().getDisplayMetrics();
-            float averageDpi=(metrics.xdpi+metrics.ydpi)/2;
-            scale=(minimumTileDpi/averageDpi)*scale;
+    protected int calculateInSampleSize(float scale) {
+        if (minimumTileDpi > 0) {
+            DisplayMetrics metrics = getResources().getDisplayMetrics();
+            float averageDpi = (metrics.xdpi + metrics.ydpi) / 2;
+            scale = (minimumTileDpi / averageDpi) * scale;
         }
 
-        int reqWidth=(int)(sWidth()*scale);
-        int reqHeight=(int)(sHeight()*scale);
+        int reqWidth = (int) (sWidth() * scale);
+        int reqHeight = (int) (sHeight() * scale);
 
         // Raw height and width of image
-        int inSampleSize=1;
-        if(reqWidth==0||reqHeight==0){
+        int inSampleSize = 1;
+        if (reqWidth == 0 || reqHeight == 0) {
             return 32;
         }
 
-        if(sHeight()>reqHeight||sWidth()>reqWidth){
+        if (sHeight() > reqHeight || sWidth() > reqWidth) {
 
             // Calculate ratios of height and width to requested height and width
-            final int heightRatio=Math.round((float)sHeight()/(float)reqHeight);
-            final int widthRatio=Math.round((float)sWidth()/(float)reqWidth);
+            final int heightRatio = Math.round((float) sHeight() / (float) reqHeight);
+            final int widthRatio = Math.round((float) sWidth() / (float) reqWidth);
 
             // Choose the smallest ratio as inSampleSize value, this will guarantee
             // a final image with both dimensions larger than or equal to the
             // requested height and width.
-            inSampleSize=heightRatio<widthRatio ? heightRatio : widthRatio;
+            inSampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
         }
 
         // We want the actual sample size that will be used, so round down to nearest power of 2.
-        int power=1;
-        while(power*2<inSampleSize){
-            power=power*2;
+        int power = 1;
+        while (power * 2 < inSampleSize) {
+            power = power * 2;
         }
 
         return power;
     }
 
-    protected void fitToBounds(boolean center,ScaleAndTranslate sat){
-        if(panLimit==PAN_LIMIT_OUTSIDE&&isReady()){
-            center=false;
+    protected void fitToBounds(boolean center, ScaleAndTranslate sat) {
+        if (panLimit == PAN_LIMIT_OUTSIDE && isReady()) {
+            center = false;
         }
 
-        PointF vTranslate=sat.vTranslate;
-        float scale=limitedScale(sat.scale);
-        float scaleWidth=scale*sWidth();
-        float scaleHeight=scale*sHeight();
+        PointF vTranslate = sat.vTranslate;
+        float scale = limitedScale(sat.scale);
+        float scaleWidth = scale * sWidth();
+        float scaleHeight = scale * sHeight();
 
-        if(panLimit==PAN_LIMIT_CENTER&&isReady()){
-            vTranslate.x=Math.max(vTranslate.x,getWidth()/2-scaleWidth);
-            vTranslate.y=Math.max(vTranslate.y,getHeight()/2-scaleHeight);
-        } else if(center){
-            vTranslate.x=Math.max(vTranslate.x,getWidth()-scaleWidth);
-            vTranslate.y=Math.max(vTranslate.y,getHeight()-scaleHeight);
-        } else{
-            vTranslate.x=Math.max(vTranslate.x,-scaleWidth);
-            vTranslate.y=Math.max(vTranslate.y,-scaleHeight);
+        if (panLimit == PAN_LIMIT_CENTER && isReady()) {
+            vTranslate.x = Math.max(vTranslate.x, getWidth() / 2 - scaleWidth);
+            vTranslate.y = Math.max(vTranslate.y, getHeight() / 2 - scaleHeight);
+        } else if (center) {
+            vTranslate.x = Math.max(vTranslate.x, getWidth() - scaleWidth);
+            vTranslate.y = Math.max(vTranslate.y, getHeight() - scaleHeight);
+        } else {
+            vTranslate.x = Math.max(vTranslate.x, -scaleWidth);
+            vTranslate.y = Math.max(vTranslate.y, -scaleHeight);
         }
 
         // Asymmetric padding adjustments
-        float xPaddingRatio=
-                getPaddingLeft()>0||getPaddingRight()>0 ? getPaddingLeft()/(float)(getPaddingLeft()+getPaddingRight()) :
+        float xPaddingRatio =
+                getPaddingLeft() > 0 || getPaddingRight() > 0 ? getPaddingLeft() / (float) (getPaddingLeft() + getPaddingRight()) :
                         0.5f;
-        float yPaddingRatio=
-                getPaddingTop()>0||getPaddingBottom()>0 ? getPaddingTop()/(float)(getPaddingTop()+getPaddingBottom()) :
+        float yPaddingRatio =
+                getPaddingTop() > 0 || getPaddingBottom() > 0 ? getPaddingTop() / (float) (getPaddingTop() + getPaddingBottom()) :
                         0.5f;
 
         float maxTx;
         float maxTy;
-        if(panLimit==PAN_LIMIT_CENTER&&isReady()){
-            maxTx=Math.max(0,getWidth()/2);
-            maxTy=Math.max(0,getHeight()/2);
-        } else if(center){
-            maxTx=Math.max(0,(getWidth()-scaleWidth)*xPaddingRatio);
-            maxTy=Math.max(0,(getHeight()-scaleHeight)*yPaddingRatio);
-        } else{
-            maxTx=Math.max(0,getWidth());
-            maxTy=Math.max(0,getHeight());
+        if (panLimit == PAN_LIMIT_CENTER && isReady()) {
+            maxTx = Math.max(0, getWidth() / 2);
+            maxTy = Math.max(0, getHeight() / 2);
+        } else if (center) {
+            maxTx = Math.max(0, (getWidth() - scaleWidth) * xPaddingRatio);
+            maxTy = Math.max(0, (getHeight() - scaleHeight) * yPaddingRatio);
+        } else {
+            maxTx = Math.max(0, getWidth());
+            maxTy = Math.max(0, getHeight());
         }
 
-        vTranslate.x=Math.min(vTranslate.x,maxTx);
-        vTranslate.y=Math.min(vTranslate.y,maxTy);
+        vTranslate.x = Math.min(vTranslate.x, maxTx);
+        vTranslate.y = Math.min(vTranslate.y, maxTy);
 
-        sat.scale=scale;
+        sat.scale = scale;
     }
 
-    protected void fitToBounds(boolean center){
-        boolean init=false;
-        if(vTranslate==null){
-            init=true;
-            vTranslate=new PointF(0,0);
+    protected void fitToBounds(boolean center) {
+        boolean init = false;
+        if (vTranslate == null) {
+            init = true;
+            vTranslate = new PointF(0, 0);
         }
-        if(satTemp==null){
-            satTemp=new ScaleAndTranslate(0,new PointF(0,0));
+        if (satTemp == null) {
+            satTemp = new ScaleAndTranslate(0, new PointF(0, 0));
         }
-        satTemp.scale=scale;
+        satTemp.scale = scale;
         satTemp.vTranslate.set(vTranslate);
-        fitToBounds(center,satTemp);
-        scale=satTemp.scale;
+        fitToBounds(center, satTemp);
+        scale = satTemp.scale;
         vTranslate.set(satTemp.vTranslate);
-        if(init&&minimumScaleType!=SCALE_TYPE_START){
-            vTranslate.set(vTranslateForSCenter(sWidth()/2,sHeight()/2,scale));
+        if (init && minimumScaleType != SCALE_TYPE_START) {
+            vTranslate.set(vTranslateForSCenter(sWidth() / 2, sHeight() / 2, scale));
         }
     }
 
-    protected void initialiseTileMap(Point maxTileDimensions){
-        debug("initialiseTileMap maxTileDimensions=%dx%d",maxTileDimensions.x,maxTileDimensions.y);
-        this.tileMap=new LinkedHashMap<>();
-        int sampleSize=fullImageSampleSize;
-        int xTiles=1;
-        int yTiles=1;
-        while(true){
-            int sTileWidth=sWidth()/xTiles;
-            int sTileHeight=sHeight()/yTiles;
-            int subTileWidth=sTileWidth/sampleSize;
-            int subTileHeight=sTileHeight/sampleSize;
-            while(subTileWidth+xTiles+1>maxTileDimensions.x||
-                  (subTileWidth>getWidth()*1.25&&sampleSize<fullImageSampleSize)){
-                xTiles+=1;
-                sTileWidth=sWidth()/xTiles;
-                subTileWidth=sTileWidth/sampleSize;
+    protected void initialiseTileMap(Point maxTileDimensions) {
+        debug("initialiseTileMap maxTileDimensions=%dx%d", maxTileDimensions.x, maxTileDimensions.y);
+        this.tileMap = new LinkedHashMap<>();
+        int sampleSize = fullImageSampleSize;
+        int xTiles = 1;
+        int yTiles = 1;
+        while (true) {
+            int sTileWidth = sWidth() / xTiles;
+            int sTileHeight = sHeight() / yTiles;
+            int subTileWidth = sTileWidth / sampleSize;
+            int subTileHeight = sTileHeight / sampleSize;
+            while (subTileWidth + xTiles + 1 > maxTileDimensions.x ||
+                    (subTileWidth > getWidth() * 1.25 && sampleSize < fullImageSampleSize)) {
+                xTiles += 1;
+                sTileWidth = sWidth() / xTiles;
+                subTileWidth = sTileWidth / sampleSize;
             }
-            while(subTileHeight+yTiles+1>maxTileDimensions.y||
-                  (subTileHeight>getHeight()*1.25&&sampleSize<fullImageSampleSize)){
-                yTiles+=1;
-                sTileHeight=sHeight()/yTiles;
-                subTileHeight=sTileHeight/sampleSize;
+            while (subTileHeight + yTiles + 1 > maxTileDimensions.y ||
+                    (subTileHeight > getHeight() * 1.25 && sampleSize < fullImageSampleSize)) {
+                yTiles += 1;
+                sTileHeight = sHeight() / yTiles;
+                subTileHeight = sTileHeight / sampleSize;
             }
-            List<Tile> tileGrid=new ArrayList<>(xTiles*yTiles);
-            for(int x=0;x<xTiles;x++){
-                for(int y=0;y<yTiles;y++){
-                    Tile tile=new Tile();
-                    tile.sampleSize=sampleSize;
-                    tile.visible=sampleSize==fullImageSampleSize;
-                    tile.sRect=new Rect(x*sTileWidth,
-                                        y*sTileHeight,
-                                        x==xTiles-1 ? sWidth() : (x+1)*sTileWidth,
-                                        y==yTiles-1 ? sHeight() : (y+1)*sTileHeight);
-                    tile.vRect=new Rect(0,0,0,0);
-                    tile.fileSRect=new Rect(tile.sRect);
+            List<Tile> tileGrid = new ArrayList<>(xTiles * yTiles);
+            for (int x = 0; x < xTiles; x++) {
+                for (int y = 0; y < yTiles; y++) {
+                    Tile tile = new Tile();
+                    tile.sampleSize = sampleSize;
+                    tile.visible = sampleSize == fullImageSampleSize;
+                    tile.sRect = new Rect(x * sTileWidth,
+                            y * sTileHeight,
+                            x == xTiles - 1 ? sWidth() : (x + 1) * sTileWidth,
+                            y == yTiles - 1 ? sHeight() : (y + 1) * sTileHeight);
+                    tile.vRect = new Rect(0, 0, 0, 0);
+                    tile.fileSRect = new Rect(tile.sRect);
                     tileGrid.add(tile);
                 }
             }
-            tileMap.put(sampleSize,tileGrid);
-            if(sampleSize==1){
+            tileMap.put(sampleSize, tileGrid);
+            if (sampleSize == 1) {
                 break;
-            } else{
-                sampleSize/=2;
+            } else {
+                sampleSize /= 2;
             }
         }
     }
 
-    protected static class TilesInitTask extends AsyncTask<Void,Void,int[]>{
-        protected final WeakReference<ScaleImageView> viewRef;
-        protected final WeakReference<Context> contextRef;
-        protected final WeakReference<DecoderFactory<? extends ImageRegionDecoder>> decoderFactoryRef;
-        protected final Uri source;
-        protected ImageRegionDecoder decoder;
-        protected Exception exception;
-
-        TilesInitTask(
-                ScaleImageView view,
-                Context context,
-                DecoderFactory<? extends ImageRegionDecoder> decoderFactory,
-                Uri source)
-        {
-            this.viewRef=new WeakReference<>(view);
-            this.contextRef=new WeakReference<>(context);
-            this.decoderFactoryRef=new WeakReference<DecoderFactory<? extends ImageRegionDecoder>>(decoderFactory);
-            this.source=source;
-        }
-
-        @Override
-        protected int[] doInBackground(Void... params){
-            try{
-                String sourceUri=source.toString();
-                Context context=contextRef.get();
-                DecoderFactory<? extends ImageRegionDecoder> decoderFactory=decoderFactoryRef.get();
-                ScaleImageView view=viewRef.get();
-                if(context!=null&&decoderFactory!=null&&view!=null){
-                    view.debug("TilesInitTask.doInBackground");
-                    decoder=decoderFactory.make();
-                    Point dimensions=decoder.init(context,source);
-                    int sWidth=dimensions.x;
-                    int sHeight=dimensions.y;
-                    int exifOrientation=view.getExifOrientation(context,sourceUri);
-                    if(view.sRegion!=null){
-                        view.sRegion.left=Math.max(0,view.sRegion.left);
-                        view.sRegion.top=Math.max(0,view.sRegion.top);
-                        view.sRegion.right=Math.min(sWidth,view.sRegion.right);
-                        view.sRegion.bottom=Math.min(sHeight,view.sRegion.bottom);
-                        sWidth=view.sRegion.width();
-                        sHeight=view.sRegion.height();
-                    }
-                    return new int[]{sWidth,sHeight,exifOrientation};
-                }
-            } catch(Exception e){
-                Log.e(TAG,"Failed to initialise bitmap decoder",e);
-                this.exception=e;
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(int[] xyo){
-            final ScaleImageView view=viewRef.get();
-            if(view!=null){
-                if(decoder!=null&&xyo!=null&&xyo.length==3){
-                    view.onTilesInited(decoder,xyo[0],xyo[1],xyo[2]);
-                } else if(exception!=null&&view.onImageEventListener!=null){
-                    view.onImageEventListener.onImageLoadError(exception);
-                }
-            }
-        }
-    }
-
-    protected synchronized void onTilesInited(ImageRegionDecoder decoder,int sWidth,int sHeight,int sOrientation){
-        debug("onTilesInited sWidth=%d, sHeight=%d, sOrientation=%d",sWidth,sHeight,orientation);
+    protected synchronized void onTilesInited(ImageRegionDecoder decoder, int sWidth, int sHeight, int sOrientation) {
+        debug("onTilesInited sWidth=%d, sHeight=%d, sOrientation=%d", sWidth, sHeight, sOrientation);
         // If actual dimensions don't match the declared size, reset everything.
-        if(this.sWidth>0&&this.sHeight>0&&(this.sWidth!=sWidth||this.sHeight!=sHeight)){
+        if (this.sWidth > 0 && this.sHeight > 0 && (this.sWidth != sWidth || this.sHeight != sHeight)) {
             reset(false);
-            if(bitmap!=null){
-                if(!bitmapIsCached){
+            if (bitmap != null) {
+                if (!bitmapIsCached) {
                     bitmap.recycle();
                 }
-                bitmap=null;
-                if(onImageEventListener!=null&&bitmapIsCached){
+                bitmap = null;
+                if (onImageEventListener != null && bitmapIsCached) {
                     onImageEventListener.onPreviewReleased();
                 }
-                bitmapIsPreview=false;
-                bitmapIsCached=false;
+                bitmapIsPreview = false;
+                bitmapIsCached = false;
             }
         }
-        this.isCallSuperOnDraw=false;
-        this.decoder=decoder;
-        this.sWidth=sWidth;
-        this.sHeight=sHeight;
-        this.sOrientation=sOrientation;
+        this.isCallSuperOnDraw = false;
+        this.decoder = decoder;
+        this.sWidth = sWidth;
+        this.sHeight = sHeight;
+        this.sOrientation = sOrientation;
         checkReady();
-        if(!checkImageLoaded()&&maxTileWidth>0&&maxTileWidth!=TILE_SIZE_AUTO&&maxTileHeight>0&&
-           maxTileHeight!=TILE_SIZE_AUTO&&getWidth()>0&&getHeight()>0)
-        {
-            initialiseBaseLayer(new Point(maxTileWidth,maxTileHeight));
+        if (!checkImageLoaded() && maxTileWidth > 0 && maxTileWidth != TILE_SIZE_AUTO && maxTileHeight > 0 &&
+                maxTileHeight != TILE_SIZE_AUTO && getWidth() > 0 && getHeight() > 0) {
+            initialiseBaseLayer(new Point(maxTileWidth, maxTileHeight));
         }
         invalidate();
         requestLayout();
     }
 
-    protected static class TileLoadTask extends AsyncTask<Void,Void,Bitmap>{
-        protected final WeakReference<ScaleImageView> viewRef;
-        protected final WeakReference<ImageRegionDecoder> decoderRef;
-        protected final WeakReference<Tile> tileRef;
-        protected Exception exception;
-
-        TileLoadTask(ScaleImageView view,ImageRegionDecoder decoder,Tile tile){
-            this.viewRef=new WeakReference<>(view);
-            this.decoderRef=new WeakReference<>(decoder);
-            this.tileRef=new WeakReference<>(tile);
-            tile.loading=true;
-        }
-
-        @Override
-        protected Bitmap doInBackground(Void... params){
-            try{
-                ScaleImageView view=viewRef.get();
-                ImageRegionDecoder decoder=decoderRef.get();
-                Tile tile=tileRef.get();
-                if(decoder!=null&&tile!=null&&view!=null&&decoder.isReady()&&tile.visible){
-                    view.debug("TileLoadTask.doInBackground, tile.sRect=%s, tile.sampleSize=%d",
-                               tile.sRect,
-                               tile.sampleSize);
-                    view.decoderLock.readLock().lock();
-                    try{
-                        if(decoder.isReady()){
-                            // Update tile's file sRect according to rotation
-                            view.fileSRect(tile.sRect,tile.fileSRect);
-                            if(view.sRegion!=null){
-                                tile.fileSRect.offset(view.sRegion.left,view.sRegion.top);
-                            }
-                            return decoder.decodeRegion(tile.fileSRect,tile.sampleSize);
-                        } else{
-                            tile.loading=false;
-                        }
-                    } finally{
-                        view.decoderLock.readLock().unlock();
-                    }
-                } else if(tile!=null){
-                    tile.loading=false;
-                }
-            } catch(Exception e){
-                Log.e(TAG,"Failed to decode tile",e);
-                this.exception=e;
-            } catch(OutOfMemoryError e){
-                Log.e(TAG,"Failed to decode tile - OutOfMemoryError",e);
-                this.exception=new RuntimeException(e);
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Bitmap bitmap){
-            final ScaleImageView scaleImageView=viewRef.get();
-            final Tile tile=tileRef.get();
-            if(scaleImageView!=null&&tile!=null){
-                if(bitmap!=null){
-                    tile.bitmap=bitmap;
-                    tile.loading=false;
-                    scaleImageView.onTileLoaded();
-                } else if(exception!=null&&scaleImageView.onImageEventListener!=null){
-                    scaleImageView.onImageEventListener.onTileLoadError(exception);
-                }
-            }
-        }
-    }
-
-    protected synchronized void onTileLoaded(){
+    protected synchronized void onTileLoaded() {
         debug("onTileLoaded");
         checkReady();
         checkImageLoaded();
-        if(isBaseLayerReady()&&bitmap!=null){
-            if(!bitmapIsCached){
+        if (isBaseLayerReady() && bitmap != null) {
+            if (!bitmapIsCached) {
                 bitmap.recycle();
             }
-            bitmap=null;
-            if(onImageEventListener!=null&&bitmapIsCached){
+            bitmap = null;
+            if (onImageEventListener != null && bitmapIsCached) {
                 onImageEventListener.onPreviewReleased();
             }
-            bitmapIsPreview=false;
-            bitmapIsCached=false;
+            bitmapIsPreview = false;
+            bitmapIsCached = false;
         }
         invalidate();
     }
 
-    protected static class BitmapLoadTask extends AsyncTask<Void,Void,Integer>{
-        protected final WeakReference<ScaleImageView> viewRef;
-        protected final WeakReference<Context> contextRef;
-        protected final WeakReference<DecoderFactory<? extends ImageDecoder>> decoderFactoryRef;
-        protected final Uri source;
-        protected final boolean preview;
-        protected Bitmap bitmap;
-        protected Exception exception;
-
-        BitmapLoadTask(
-                ScaleImageView view,
-                Context context,
-                DecoderFactory<? extends ImageDecoder> decoderFactory,
-                Uri source,
-                boolean preview)
-        {
-            this.viewRef=new WeakReference<>(view);
-            this.contextRef=new WeakReference<>(context);
-            this.decoderFactoryRef=new WeakReference<DecoderFactory<? extends ImageDecoder>>(decoderFactory);
-            this.source=source;
-            this.preview=preview;
-        }
-
-        @Override
-        protected Integer doInBackground(Void... params){
-            try{
-                String sourceUri=source.toString();
-                Context context=contextRef.get();
-                DecoderFactory<? extends ImageDecoder> decoderFactory=decoderFactoryRef.get();
-                ScaleImageView view=viewRef.get();
-                if(context!=null&&decoderFactory!=null&&view!=null){
-                    view.debug("BitmapLoadTask.doInBackground");
-                    bitmap=decoderFactory.make().decode(context,source);
-                    return view.getExifOrientation(context,sourceUri);
-                }
-            } catch(Exception e){
-                Log.e(TAG,"Failed to load bitmap",e);
-                this.exception=e;
-            } catch(OutOfMemoryError e){
-                Log.e(TAG,"Failed to load bitmap - OutOfMemoryError",e);
-                this.exception=new RuntimeException(e);
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Integer orientation){
-            ScaleImageView scaleImageView=viewRef.get();
-            if(scaleImageView!=null){
-                if(bitmap!=null&&orientation!=null){
-                    if(preview){
-                        scaleImageView.onPreviewLoaded(bitmap);
-                    } else{
-                        scaleImageView.onImageLoaded(bitmap,orientation,false);
-                    }
-                } else if(exception!=null&&scaleImageView.onImageEventListener!=null){
-                    if(preview){
-                        scaleImageView.onImageEventListener.onPreviewLoadError(exception);
-                    } else{
-                        scaleImageView.onImageEventListener.onImageLoadError(exception);
-                    }
-                }
-            }
-        }
-    }
-
-    protected synchronized void onPreviewLoaded(Bitmap previewBitmap){
+    protected synchronized void onPreviewLoaded(Bitmap previewBitmap) {
         debug("onPreviewLoaded");
-        if(bitmap!=null||imageLoadedSent){
+        if (bitmap != null || imageLoadedSent) {
             previewBitmap.recycle();
             return;
         }
-        if(pRegion!=null){
-            bitmap=Bitmap.createBitmap(previewBitmap,pRegion.left,pRegion.top,pRegion.width(),pRegion.height());
-        } else{
-            bitmap=previewBitmap;
+        if (pRegion != null) {
+            bitmap = Bitmap.createBitmap(previewBitmap, pRegion.left, pRegion.top, pRegion.width(), pRegion.height());
+        } else {
+            bitmap = previewBitmap;
         }
-        this.isCallSuperOnDraw=false;
-        bitmapIsPreview=true;
-        if(checkReady()){
+        this.isCallSuperOnDraw = false;
+        bitmapIsPreview = true;
+        if (checkReady()) {
             invalidate();
             requestLayout();
         }
     }
 
-    protected synchronized void onImageLoaded(Bitmap bitmap,int sOrientation,boolean bitmapIsCached){
+    protected synchronized void onImageLoaded(Bitmap bitmap, int sOrientation, boolean bitmapIsCached) {
         debug("onImageLoaded");
         // If actual dimensions don't match the declared size, reset everything.
-        if(this.sWidth>0&&this.sHeight>0&&(this.sWidth!=bitmap.getWidth()||this.sHeight!=bitmap.getHeight())){
+        if (this.sWidth > 0 && this.sHeight > 0 && (this.sWidth != bitmap.getWidth() || this.sHeight != bitmap.getHeight())) {
             reset(false);
         }
-        if(this.bitmap!=null&&!this.bitmapIsCached){
+        if (this.bitmap != null && !this.bitmapIsCached) {
             this.bitmap.recycle();
         }
 
-        if(this.bitmap!=null&&this.bitmapIsCached&&onImageEventListener!=null){
+        if (this.bitmap != null && this.bitmapIsCached && onImageEventListener != null) {
             onImageEventListener.onPreviewReleased();
         }
-        this.isCallSuperOnDraw=false;
-        this.bitmapIsPreview=false;
-        this.bitmapIsCached=bitmapIsCached;
-        this.bitmap=bitmap;
-        this.sWidth=bitmap.getWidth();
-        this.sHeight=bitmap.getHeight();
-        this.sOrientation=sOrientation;
-        boolean ready=checkReady();
-        boolean imageLoaded=checkImageLoaded();
-        if(ready||imageLoaded){
+        this.isCallSuperOnDraw = false;
+        this.bitmapIsPreview = false;
+        this.bitmapIsCached = bitmapIsCached;
+        this.bitmap = bitmap;
+        this.sWidth = bitmap.getWidth();
+        this.sHeight = bitmap.getHeight();
+        this.sOrientation = sOrientation;
+        boolean ready = checkReady();
+        boolean imageLoaded = checkImageLoaded();
+        if (ready || imageLoaded) {
             invalidate();
             requestLayout();
         }
     }
 
+    protected void execute(AsyncTask<Void, Void, ?> asyncTask) {
+        asyncTask.executeOnExecutor(executor);
+    }
+
+    @Override
+    public Drawable getDrawable() {
+        if (!isCallSuperOnDraw) {
+            return null;
+        }
+        return super.getDrawable();
+    }
+
     @AnyThread
-    protected int getExifOrientation(Context context,String sourceUri){
-        int exifOrientation=ORIENTATION_0;
-        if(sourceUri.startsWith(ContentResolver.SCHEME_CONTENT)){
-            Cursor cursor=null;
-            try{
-                String[] columns={MediaStore.Images.Media.ORIENTATION};
-                cursor=context.getContentResolver().query(Uri.parse(sourceUri),columns,null,null,null);
-                if(cursor!=null){
-                    if(cursor.moveToFirst()){
-                        int orientation=cursor.getInt(0);
-                        if(VALID_ORIENTATIONS.contains(orientation)&&orientation!=ORIENTATION_USE_EXIF){
-                            exifOrientation=orientation;
-                        } else{
-                            Log.w(TAG,"Unsupported orientation: "+orientation);
+    protected int getExifOrientation(Context context, String sourceUri) {
+        int exifOrientation = ORIENTATION_0;
+        if (sourceUri.startsWith(ContentResolver.SCHEME_CONTENT)) {
+            Cursor cursor = null;
+            try {
+                String[] columns = {MediaStore.Images.Media.ORIENTATION};
+                cursor = context.getContentResolver().query(Uri.parse(sourceUri), columns, null, null, null);
+                if (cursor != null) {
+                    if (cursor.moveToFirst()) {
+                        int orientation = cursor.getInt(0);
+                        if (VALID_ORIENTATIONS.contains(orientation) && orientation != ORIENTATION_USE_EXIF) {
+                            exifOrientation = orientation;
+                        } else {
+                            Log.w(TAG, "Unsupported orientation: " + orientation);
                         }
                     }
                 }
-            } catch(Exception e){
-                Log.w(TAG,"Could not get orientation of image from media store");
-            } finally{
-                if(cursor!=null){
+            } catch (Exception e) {
+                Log.w(TAG, "Could not get orientation of image from media store");
+            } finally {
+                if (cursor != null) {
                     cursor.close();
                 }
             }
-        } else if(sourceUri.startsWith(ImageSource.FILE_SCHEME)&&!sourceUri.startsWith(ImageSource.ASSET_SCHEME)){
-            try{
-                ExifInterface exifInterface=new ExifInterface(sourceUri.substring(ImageSource.FILE_SCHEME.length()-1));
-                int orientationAttr=exifInterface.getAttributeInt(ExifInterface.TAG_ORIENTATION,
-                                                                  ExifInterface.ORIENTATION_NORMAL);
-                if(orientationAttr==ExifInterface.ORIENTATION_NORMAL||
-                   orientationAttr==ExifInterface.ORIENTATION_UNDEFINED)
-                {
-                    exifOrientation=ORIENTATION_0;
-                } else if(orientationAttr==ExifInterface.ORIENTATION_ROTATE_90){
-                    exifOrientation=ORIENTATION_90;
-                } else if(orientationAttr==ExifInterface.ORIENTATION_ROTATE_180){
-                    exifOrientation=ORIENTATION_180;
-                } else if(orientationAttr==ExifInterface.ORIENTATION_ROTATE_270){
-                    exifOrientation=ORIENTATION_270;
-                } else{
-                    Log.w(TAG,"Unsupported EXIF orientation: "+orientationAttr);
+        } else if (sourceUri.startsWith(ImageSource.FILE_SCHEME) && !sourceUri.startsWith(ImageSource.ASSET_SCHEME)) {
+            try {
+                ExifInterface exifInterface = new ExifInterface(sourceUri.substring(ImageSource.FILE_SCHEME.length() - 1));
+                int orientationAttr = exifInterface.getAttributeInt(ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL);
+                if (orientationAttr == ExifInterface.ORIENTATION_NORMAL ||
+                        orientationAttr == ExifInterface.ORIENTATION_UNDEFINED) {
+                    exifOrientation = ORIENTATION_0;
+                } else if (orientationAttr == ExifInterface.ORIENTATION_ROTATE_90) {
+                    exifOrientation = ORIENTATION_90;
+                } else if (orientationAttr == ExifInterface.ORIENTATION_ROTATE_180) {
+                    exifOrientation = ORIENTATION_180;
+                } else if (orientationAttr == ExifInterface.ORIENTATION_ROTATE_270) {
+                    exifOrientation = ORIENTATION_270;
+                } else {
+                    Log.w(TAG, "Unsupported EXIF orientation: " + orientationAttr);
                 }
-            } catch(Exception e){
-                Log.w(TAG,"Could not get EXIF orientation of image");
+            } catch (Exception e) {
+                Log.w(TAG, "Could not get EXIF orientation of image");
             }
+        } else {
+            exifOrientation = ImageDecoder2.getOrientation(context, Uri.parse(sourceUri));
         }
         return exifOrientation;
     }
 
-    protected void execute(AsyncTask<Void,Void,?> asyncTask){
-        asyncTask.executeOnExecutor(executor);
-    }
-
-    protected static class Tile{
-
-        protected Rect sRect;
-        protected int sampleSize;
-        protected Bitmap bitmap;
-        protected boolean loading;
-        protected boolean visible;
-
-        // Volatile fields instantiated once then updated before use to reduce GC.
-        protected Rect vRect;
-        protected Rect fileSRect;
-
-    }
-
-    protected static class Anim{
-
-        protected float scaleStart; // Scale at start of anim
-        protected float scaleEnd; // Scale at end of anim (target)
-        protected PointF sCenterStart; // Source center point at start
-        protected PointF sCenterEnd; // Source center point at end, adjusted for pan limits
-        protected PointF sCenterEndRequested; // Source center point that was requested, without adjustment
-        protected PointF vFocusStart; // View point that was double tapped
-        protected PointF vFocusEnd; // Where the view focal point should be moved to during the anim
-        protected long duration=500; // How long the anim takes
-        protected boolean interruptible=true; // Whether the anim can be interrupted by a touch
-        protected int easing=EASE_IN_OUT_QUAD; // Easing style
-        protected int origin=ORIGIN_ANIM; // Animation origin (API, double tap or fling)
-        protected long time=System.currentTimeMillis(); // Start time
-        protected OnAnimationEventListener listener; // Event listener
-
-    }
-
-    protected static class ScaleAndTranslate{
-        protected ScaleAndTranslate(float scale,PointF vTranslate){
-            this.scale=scale;
-            this.vTranslate=vTranslate;
+    @Override
+    public void setImageBitmap(Bitmap bm) {
+        isCallSuperOnDraw = true;
+        if (bitmap != null) {
+            bitmap.recycle();
         }
-
-        protected float scale;
-        protected final PointF vTranslate;
+        bitmap = null;
+        super.setImageBitmap(bm);
     }
 
-    protected void restoreState(ImageViewState state){
-        if(state!=null&&VALID_ORIENTATIONS.contains(state.getOrientation())){
-            this.orientation=state.getOrientation();
-            this.pendingScale=state.getScale();
-            this.sPendingCenter=state.getCenter();
+    protected void restoreState(ImageViewState state) {
+        if (state != null && VALID_ORIENTATIONS.contains(state.getOrientation())) {
+            this.orientation = state.getOrientation();
+            this.pendingScale = state.getScale();
+            this.sPendingCenter = state.getCenter();
             invalidate();
         }
     }
 
-    public void setMaxTileSize(int maxPixels){
-        this.maxTileWidth=maxPixels;
-        this.maxTileHeight=maxPixels;
+    public void setMaxTileSize(int maxPixels) {
+        this.maxTileWidth = maxPixels;
+        this.maxTileHeight = maxPixels;
     }
 
-    public void setMaxTileSize(int maxPixelsX,int maxPixelsY){
-        this.maxTileWidth=maxPixelsX;
-        this.maxTileHeight=maxPixelsY;
+    public void setMaxTileSize(int maxPixelsX, int maxPixelsY) {
+        this.maxTileWidth = maxPixelsX;
+        this.maxTileHeight = maxPixelsY;
     }
 
     @NonNull
-    protected Point getMaxBitmapDimensions(Canvas canvas){
-        return new Point(Math.min(canvas.getMaximumBitmapWidth(),maxTileWidth),
-                         Math.min(canvas.getMaximumBitmapHeight(),maxTileHeight));
+    protected Point getMaxBitmapDimensions(Canvas canvas) {
+        return new Point(Math.min(canvas.getMaximumBitmapWidth(), maxTileWidth),
+                Math.min(canvas.getMaximumBitmapHeight(), maxTileHeight));
+    }
+
+    @Override
+    public void setImageURI(Uri uri) {
+        isCallSuperOnDraw = true;
+        if (bitmap != null) {
+            bitmap.recycle();
+        }
+        bitmap = null;
+        super.setImageURI(uri);
     }
 
     @SuppressWarnings("SuspiciousNameCombination")
-    protected int sWidth(){
-        int rotation=getRequiredRotation();
-        if(rotation==90||rotation==270){
+    protected int sWidth() {
+        int rotation = getRequiredRotation();
+        if (rotation == 90 || rotation == 270) {
             return sHeight;
-        } else{
+        } else {
             return sWidth;
         }
     }
 
+    @Override
+    public void setImageResource(int resId) {
+        isCallSuperOnDraw = true;
+        if (bitmap != null) {
+            bitmap.recycle();
+        }
+        bitmap = null;
+        super.setImageResource(resId);
+    }
+
     @SuppressWarnings("SuspiciousNameCombination")
-    protected int sHeight(){
-        int rotation=getRequiredRotation();
-        if(rotation==90||rotation==270){
+    protected int sHeight() {
+        int rotation = getRequiredRotation();
+        if (rotation == 90 || rotation == 270) {
             return sWidth;
-        } else{
+        } else {
             return sHeight;
         }
     }
@@ -2743,51 +2551,250 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
         if(bitmap!=null){
             bitmap.recycle();
         }
-        bitmap=null;
+        bitmap = null;
         super.setImageDrawable(drawable);
     }
 
     @Override
-    public void setImageResource(int resId){
-        isCallSuperOnDraw=true;
-        if(bitmap!=null){
-            bitmap.recycle();
-        }
-        bitmap=null;
-        super.setImageResource(resId);
+    public void setOnDoubleTapListener(GestureDetector.OnDoubleTapListener onDoubleTapListener) {
+        super.setOnDoubleTapListener(onDoubleTapListener);
+        this.onDoubleTapListener = onDoubleTapListener;
     }
 
-    @Override
-    public void setImageURI(Uri uri){
-        isCallSuperOnDraw=true;
-        if(bitmap!=null){
-            bitmap.recycle();
-        }
-        bitmap=null;
-        super.setImageURI(uri);
-    }
+    protected static class TilesInitTask extends AsyncTask<Void, Void, int[]> {
+        protected final WeakReference<ScaleImageView> viewRef;
+        protected final WeakReference<Context> contextRef;
+        protected final WeakReference<DecoderFactory<? extends ImageRegionDecoder>> decoderFactoryRef;
+        protected final Uri source;
+        protected ImageRegionDecoder decoder;
+        protected Exception exception;
 
-    @Override
-    public void setImageBitmap(Bitmap bm){
-        isCallSuperOnDraw=true;
-        if(bitmap!=null){
-            bitmap.recycle();
+        TilesInitTask(
+                ScaleImageView view,
+                Context context,
+                DecoderFactory<? extends ImageRegionDecoder> decoderFactory,
+                Uri source) {
+            this.viewRef = new WeakReference<>(view);
+            this.contextRef = new WeakReference<>(context);
+            this.decoderFactoryRef = new WeakReference<DecoderFactory<? extends ImageRegionDecoder>>(decoderFactory);
+            this.source = source;
         }
-        bitmap=null;
-        super.setImageBitmap(bm);
-    }
 
-    @Override
-    public Drawable getDrawable(){
-        if(!isCallSuperOnDraw){
+        @Override
+        protected int[] doInBackground(Void... params) {
+            try {
+                String sourceUri = source.toString();
+                Context context = contextRef.get();
+                DecoderFactory<? extends ImageRegionDecoder> decoderFactory = decoderFactoryRef.get();
+                ScaleImageView view = viewRef.get();
+                if (context != null && decoderFactory != null && view != null) {
+                    view.debug("TilesInitTask.doInBackground");
+                    decoder = decoderFactory.make();
+                    Point dimensions = decoder.init(context, source);
+                    int sWidth = dimensions.x;
+                    int sHeight = dimensions.y;
+                    int exifOrientation = view.getExifOrientation(context, sourceUri);
+                    if (view.sRegion != null) {
+                        view.sRegion.left = Math.max(0, view.sRegion.left);
+                        view.sRegion.top = Math.max(0, view.sRegion.top);
+                        view.sRegion.right = Math.min(sWidth, view.sRegion.right);
+                        view.sRegion.bottom = Math.min(sHeight, view.sRegion.bottom);
+                        sWidth = view.sRegion.width();
+                        sHeight = view.sRegion.height();
+                    }
+                    return new int[]{sWidth, sHeight, exifOrientation};
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to initialise bitmap decoder", e);
+                this.exception = e;
+            }
             return null;
         }
-        return super.getDrawable();
+
+        @Override
+        protected void onPostExecute(int[] xyo) {
+            final ScaleImageView view = viewRef.get();
+            if (view != null) {
+                if (decoder != null && xyo != null && xyo.length == 3) {
+                    view.onTilesInited(decoder, xyo[0], xyo[1], xyo[2]);
+                } else if (exception != null && view.onImageEventListener != null) {
+                    view.onImageEventListener.onImageLoadError(exception);
+                }
+            }
+        }
     }
 
-    @Override
-    public void setOnDoubleTapListener(GestureDetector.OnDoubleTapListener onDoubleTapListener){
-        super.setOnDoubleTapListener(onDoubleTapListener);
-        this.onDoubleTapListener=onDoubleTapListener;
+    protected static class TileLoadTask extends AsyncTask<Void, Void, Bitmap> {
+        protected final WeakReference<ScaleImageView> viewRef;
+        protected final WeakReference<ImageRegionDecoder> decoderRef;
+        protected final WeakReference<Tile> tileRef;
+        protected Exception exception;
+
+        TileLoadTask(ScaleImageView view, ImageRegionDecoder decoder, Tile tile) {
+            this.viewRef = new WeakReference<>(view);
+            this.decoderRef = new WeakReference<>(decoder);
+            this.tileRef = new WeakReference<>(tile);
+            tile.loading = true;
+        }
+
+        @Override
+        protected Bitmap doInBackground(Void... params) {
+            try {
+                ScaleImageView view = viewRef.get();
+                ImageRegionDecoder decoder = decoderRef.get();
+                Tile tile = tileRef.get();
+                if (decoder != null && tile != null && view != null && decoder.isReady() && tile.visible) {
+                    view.debug("TileLoadTask.doInBackground, tile.sRect=%s, tile.sampleSize=%d",
+                            tile.sRect,
+                            tile.sampleSize);
+                    view.decoderLock.readLock().lock();
+                    try {
+                        if (decoder.isReady()) {
+                            // Update tile's file sRect according to rotation
+                            view.fileSRect(tile.sRect, tile.fileSRect);
+                            if (view.sRegion != null) {
+                                tile.fileSRect.offset(view.sRegion.left, view.sRegion.top);
+                            }
+                            return decoder.decodeRegion(tile.fileSRect, tile.sampleSize);
+                        } else {
+                            tile.loading = false;
+                        }
+                    } finally {
+                        view.decoderLock.readLock().unlock();
+                    }
+                } else if (tile != null) {
+                    tile.loading = false;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to decode tile", e);
+                this.exception = e;
+            } catch (OutOfMemoryError e) {
+                Log.e(TAG, "Failed to decode tile - OutOfMemoryError", e);
+                this.exception = new RuntimeException(e);
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Bitmap bitmap) {
+            final ScaleImageView scaleImageView = viewRef.get();
+            final Tile tile = tileRef.get();
+            if (scaleImageView != null && tile != null) {
+                if (bitmap != null) {
+                    tile.bitmap = bitmap;
+                    tile.loading = false;
+                    scaleImageView.onTileLoaded();
+                } else if (exception != null && scaleImageView.onImageEventListener != null) {
+                    scaleImageView.onImageEventListener.onTileLoadError(exception);
+                }
+            }
+        }
+    }
+
+    protected static class ScaleAndTranslate {
+        protected final PointF vTranslate;
+        protected float scale;
+
+        protected ScaleAndTranslate(float scale, PointF vTranslate) {
+            this.scale = scale;
+            this.vTranslate = vTranslate;
+        }
+    }
+
+    protected static class BitmapLoadTask extends AsyncTask<Void, Void, Integer> {
+        protected final WeakReference<ScaleImageView> viewRef;
+        protected final WeakReference<Context> contextRef;
+        protected final WeakReference<DecoderFactory<? extends ImageDecoder>> decoderFactoryRef;
+        protected final Uri source;
+        protected final boolean preview;
+        protected Bitmap bitmap;
+        protected Exception exception;
+
+        BitmapLoadTask(
+                ScaleImageView view,
+                Context context,
+                DecoderFactory<? extends ImageDecoder> decoderFactory,
+                Uri source,
+                boolean preview) {
+            this.viewRef = new WeakReference<>(view);
+            this.contextRef = new WeakReference<>(context);
+            this.decoderFactoryRef = new WeakReference<DecoderFactory<? extends ImageDecoder>>(decoderFactory);
+            this.source = source;
+            this.preview = preview;
+        }
+
+        @Override
+        protected Integer doInBackground(Void... params) {
+            try {
+                String sourceUri = source.toString();
+                Context context = contextRef.get();
+                DecoderFactory<? extends ImageDecoder> decoderFactory = decoderFactoryRef.get();
+                ScaleImageView view = viewRef.get();
+                if (context != null && decoderFactory != null && view != null) {
+                    view.debug("BitmapLoadTask.doInBackground");
+                    bitmap = decoderFactory.make().decode(context, source);
+                    return view.getExifOrientation(context, sourceUri);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to load bitmap", e);
+                this.exception = e;
+            } catch (OutOfMemoryError e) {
+                Log.e(TAG, "Failed to load bitmap - OutOfMemoryError", e);
+                this.exception = new RuntimeException(e);
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Integer orientation) {
+            ScaleImageView scaleImageView = viewRef.get();
+            if (scaleImageView != null) {
+                if (bitmap != null && orientation != null) {
+                    if (preview) {
+                        scaleImageView.onPreviewLoaded(bitmap);
+                    } else {
+                        scaleImageView.onImageLoaded(bitmap, orientation, false);
+                    }
+                } else if (exception != null && scaleImageView.onImageEventListener != null) {
+                    if (preview) {
+                        scaleImageView.onImageEventListener.onPreviewLoadError(exception);
+                    } else {
+                        scaleImageView.onImageEventListener.onImageLoadError(exception);
+                    }
+                }
+            }
+        }
+    }
+
+    protected static class Anim {
+
+        protected float scaleStart; // Scale at start of anim
+        protected float scaleEnd; // Scale at end of anim (target)
+        protected PointF sCenterStart; // Source center point at start
+        protected PointF sCenterEnd; // Source center point at end, adjusted for pan limits
+        protected PointF sCenterEndRequested; // Source center point that was requested, without adjustment
+        protected PointF vFocusStart; // View point that was double tapped
+        protected PointF vFocusEnd; // Where the view focal point should be moved to during the anim
+        protected long duration = 500; // How long the anim takes
+        protected boolean interruptible = true; // Whether the anim can be interrupted by a touch
+        protected int easing = EASE_IN_OUT_QUAD; // Easing style
+        protected int origin = ORIGIN_ANIM; // Animation origin (API, double tap or fling)
+        protected long time = System.currentTimeMillis(); // Start time
+        protected OnAnimationEventListener listener; // Event listener
+
+    }
+
+    protected static class Tile {
+
+        protected Rect sRect;
+        protected int sampleSize;
+        protected Bitmap bitmap;
+        protected boolean loading;
+        protected boolean visible;
+
+        // Volatile fields instantiated once then updated before use to reduce GC.
+        protected Rect vRect;
+        protected Rect fileSRect;
+
     }
 }
