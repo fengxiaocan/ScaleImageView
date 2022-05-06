@@ -54,139 +54,117 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @SuppressWarnings("unused")
-public class ScaleImageView extends PhotoView implements IScaleImageView{
+public class ScaleImageView extends PhotoView implements IScaleImageView {
 
-    protected static final String TAG=ScaleImageView.class.getSimpleName();
-
-    public static final int ORIENTATION_USE_EXIF=-1;
-    public static final int ORIENTATION_0=0;
-    public static final int ORIENTATION_90=90;
-    public static final int ORIENTATION_180=180;
-    public static final int ORIENTATION_270=270;
-
-    protected static final List<Integer> VALID_ORIENTATIONS=Arrays.asList(ORIENTATION_0,
-                                                                          ORIENTATION_90,
-                                                                          ORIENTATION_180,
-                                                                          ORIENTATION_270,
-                                                                          ORIENTATION_USE_EXIF);
-
-    public static final int ZOOM_FOCUS_FIXED=1;
-    public static final int ZOOM_FOCUS_CENTER=2;
-    public static final int ZOOM_FOCUS_CENTER_IMMEDIATE=3;
-
-    protected static final List<Integer> VALID_ZOOM_STYLES=Arrays.asList(ZOOM_FOCUS_FIXED,
-                                                                         ZOOM_FOCUS_CENTER,
-                                                                         ZOOM_FOCUS_CENTER_IMMEDIATE);
-
-    public static final int EASE_OUT_QUAD=1;
-    public static final int EASE_IN_OUT_QUAD=2;
-
-    protected static final List<Integer> VALID_EASING_STYLES=Arrays.asList(EASE_IN_OUT_QUAD,EASE_OUT_QUAD);
-
-    public static final int PAN_LIMIT_INSIDE=1;
-    public static final int PAN_LIMIT_OUTSIDE=2;
-    public static final int PAN_LIMIT_CENTER=3;
-
-    protected static final List<Integer> VALID_PAN_LIMITS=Arrays.asList(PAN_LIMIT_INSIDE,
-                                                                        PAN_LIMIT_OUTSIDE,
-                                                                        PAN_LIMIT_CENTER);
-
-    public static final int SCALE_TYPE_CENTER_INSIDE=1;
-    public static final int SCALE_TYPE_CENTER_CROP=2;
-    public static final int SCALE_TYPE_CUSTOM=3;
-    public static final int SCALE_TYPE_START=4;
-
-    protected static final List<Integer> VALID_SCALE_TYPES=Arrays.asList(SCALE_TYPE_CENTER_CROP,
-                                                                         SCALE_TYPE_CENTER_INSIDE,
-                                                                         SCALE_TYPE_CUSTOM,
-                                                                         SCALE_TYPE_START);
-
-    public static final int ORIGIN_ANIM=1;
-    public static final int ORIGIN_TOUCH=2;
-    public static final int ORIGIN_FLING=3;
-    public static final int ORIGIN_DOUBLE_TAP_ZOOM=4;
-
+    public static final int ORIENTATION_USE_EXIF = -1;
+    public static final int ORIENTATION_0 = 0;
+    public static final int ORIENTATION_90 = 90;
+    public static final int ORIENTATION_180 = 180;
+    public static final int ORIENTATION_270 = 270;
+    public static final int ZOOM_FOCUS_FIXED = 1;
+    public static final int ZOOM_FOCUS_CENTER = 2;
+    public static final int ZOOM_FOCUS_CENTER_IMMEDIATE = 3;
+    public static final int EASE_OUT_QUAD = 1;
+    public static final int EASE_IN_OUT_QUAD = 2;
+    public static final int PAN_LIMIT_INSIDE = 1;
+    public static final int PAN_LIMIT_OUTSIDE = 2;
+    public static final int PAN_LIMIT_CENTER = 3;
+    public static final int SCALE_TYPE_CENTER_INSIDE = 1;
+    public static final int SCALE_TYPE_CENTER_CROP = 2;
+    public static final int SCALE_TYPE_CUSTOM = 3;
+    public static final int SCALE_TYPE_START = 4;
+    public static final int ORIGIN_ANIM = 1;
+    public static final int ORIGIN_TOUCH = 2;
+    public static final int ORIGIN_FLING = 3;
+    public static final int ORIGIN_DOUBLE_TAP_ZOOM = 4;
+    // overrides for the dimensions of the generated tiles
+    public static final int TILE_SIZE_AUTO = Integer.MAX_VALUE;
+    protected static final String TAG = ScaleImageView.class.getSimpleName();
+    protected static final List<Integer> VALID_ORIENTATIONS = Arrays.asList(ORIENTATION_0,
+            ORIENTATION_90,
+            ORIENTATION_180,
+            ORIENTATION_270,
+            ORIENTATION_USE_EXIF);
+    protected static final List<Integer> VALID_ZOOM_STYLES = Arrays.asList(ZOOM_FOCUS_FIXED,
+            ZOOM_FOCUS_CENTER,
+            ZOOM_FOCUS_CENTER_IMMEDIATE);
+    protected static final List<Integer> VALID_EASING_STYLES = Arrays.asList(EASE_IN_OUT_QUAD, EASE_OUT_QUAD);
+    protected static final List<Integer> VALID_PAN_LIMITS = Arrays.asList(PAN_LIMIT_INSIDE,
+            PAN_LIMIT_OUTSIDE,
+            PAN_LIMIT_CENTER);
+    protected static final List<Integer> VALID_SCALE_TYPES = Arrays.asList(SCALE_TYPE_CENTER_CROP,
+            SCALE_TYPE_CENTER_INSIDE,
+            SCALE_TYPE_CUSTOM,
+            SCALE_TYPE_START);
+    protected static final int MESSAGE_LONG_CLICK = 1;
+    // A global preference for bitmap format, available to decoder classes that respect it
+    protected static Bitmap.Config preferredBitmapConfig;
+    protected final ReadWriteLock decoderLock = new ReentrantReadWriteLock(true);
+    // Current quickscale state
+    protected final float quickScaleThreshold;
+    // Long click handler
+    protected final Handler handler;
+    protected final float[] srcArray = new float[8];
+    protected final float[] dstArray = new float[8];
+    //The logical density of the display
+    protected final float density;
     // Bitmap (preview or full image)
     protected Bitmap bitmap;
-
     // Whether the bitmap is a preview image
     protected boolean bitmapIsPreview;
-
     // Specifies if a cache handler is also referencing the bitmap. Do not recycle if so.
     protected boolean bitmapIsCached;
-
     // Uri of full size image
     protected Uri uri;
-
     // Sample size used to display the whole image when fully zoomed out
     protected int fullImageSampleSize;
-
     // Map of zoom level to tile grid
-    protected Map<Integer,List<Tile>> tileMap;
-
+    protected Map<Integer, List<Tile>> tileMap;
     // Overlay tile boundaries and other info
-    protected boolean debug=false;
-
+    protected boolean debug = false;
     // Image orientation setting
     protected int orientation = ORIENTATION_USE_EXIF;
-
     // Max scale allowed (prevent infinite zoom)
-    protected float maxScale=2F;
-
-    // Min scale allowed (prevent infinite zoom)
-    protected float minScale=minScale();
-
+    protected float maxScale = 2F;
     // Density to reach before loading higher resolution tiles
-    protected int minimumTileDpi=-1;
-
+    protected int minimumTileDpi = -1;
     // Pan limiting style
-    protected int panLimit=PAN_LIMIT_INSIDE;
-
+    protected int panLimit = PAN_LIMIT_INSIDE;
     // Minimum scale type
-    protected int minimumScaleType=SCALE_TYPE_CENTER_INSIDE;
-
-    // overrides for the dimensions of the generated tiles
-    public static final int TILE_SIZE_AUTO=Integer.MAX_VALUE;
-    protected int maxTileWidth=TILE_SIZE_AUTO;
-    protected int maxTileHeight=TILE_SIZE_AUTO;
-
+    protected int minimumScaleType = SCALE_TYPE_CENTER_INSIDE;
+    protected int maxTileWidth = TILE_SIZE_AUTO;
+    protected int maxTileHeight = TILE_SIZE_AUTO;
     // An executor service for loading of images
-    protected Executor executor=AsyncTask.THREAD_POOL_EXECUTOR;
-
+    protected Executor executor = AsyncTask.THREAD_POOL_EXECUTOR;
     // Whether tiles should be loaded while gestures and animations are still in progress
-    protected boolean eagerLoadingEnabled=true;
-
+    protected boolean eagerLoadingEnabled = true;
     // Gesture detection settings
-    protected boolean panEnabled=true;
-    protected boolean zoomEnabled=true;
-    protected boolean quickScaleEnabled=true;
-
+    protected boolean panEnabled = true;
+    protected boolean zoomEnabled = true;
+    protected boolean quickScaleEnabled = true;
     // Double tap zoom behaviour
-    protected float doubleTapZoomScale=1F;
-    protected int doubleTapZoomStyle=ZOOM_FOCUS_FIXED;
-    protected int doubleTapZoomDuration=500;
-
+    protected float doubleTapZoomScale = 1F;
+    protected int doubleTapZoomStyle = ZOOM_FOCUS_FIXED;
+    protected int doubleTapZoomDuration = 500;
     // Current scale and scale at start of zoom
     protected float scale;
     protected float scaleStart;
-
     // Screen coordinate of top-left corner of source image
     protected PointF vTranslate;
     protected PointF vTranslateStart;
     protected PointF vTranslateBefore;
-
     // Source coordinate to center on, used when new position is set externally before view is ready
     protected Float pendingScale;
     protected PointF sPendingCenter;
     protected PointF sRequestedCenter;
-
     // Source image dimensions and orientation - dimensions relate to the unrotated image
     protected int sWidth;
     protected int sHeight;
     protected int sOrientation;
+    // Min scale allowed (prevent infinite zoom)
+    protected float minScale = minScale();
     protected Rect sRegion;
     protected Rect pRegion;
-
     // Is two-finger zooming in progress
     protected boolean isZooming;
     // Is one-finger panning in progress
@@ -195,77 +173,51 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
     protected boolean isQuickScaling;
     // Max touches used in current gesture
     protected int maxTouchCount;
-
     // Fling detector
     protected GestureDetector detector;
     protected GestureDetector singleDetector;
-
     // Tile and image decoding
     protected ImageRegionDecoder decoder;
-    protected final ReadWriteLock decoderLock=new ReentrantReadWriteLock(true);
-    protected DecoderFactory<? extends ImageDecoder> bitmapDecoderFactory=new CompatDecoderFactory<ImageDecoder>(
+    protected DecoderFactory<? extends ImageDecoder> bitmapDecoderFactory = new CompatDecoderFactory<ImageDecoder>(
             SkiaImageDecoder.class);
-    protected DecoderFactory<? extends ImageRegionDecoder> regionDecoderFactory=
+    protected DecoderFactory<? extends ImageRegionDecoder> regionDecoderFactory =
             new CompatDecoderFactory<ImageRegionDecoder>(SkiaImageRegionDecoder.class);
-
     // Debug values
     protected PointF vCenterStart;
     protected float vDistStart;
-
-    // Current quickscale state
-    protected final float quickScaleThreshold;
     protected float quickScaleLastDistance;
     protected boolean quickScaleMoved;
     protected PointF quickScaleVLastPoint;
     protected PointF quickScaleSCenter;
-    protected PointF quickScaleVStart;
 
+    // Long click listener
+//    protected OnLongClickListener onLongClickListener;
+    protected PointF quickScaleVStart;
     // Scale and center animation tracking
     protected Anim anim;
-
     // Whether a ready notification has been sent to subclasses
     protected boolean readySent;
     // Whether a base layer loaded notification has been sent to subclasses
     protected boolean imageLoadedSent;
-
     // Event listener
     protected OnImageEventListener onImageEventListener;
-
     // Scale and center listener
     protected OnStateChangedListener onStateChangedListener;
-
-    // Long click listener
-//    protected OnLongClickListener onLongClickListener;
-
-    // Long click handler
-    protected final Handler handler;
-    protected static final int MESSAGE_LONG_CLICK=1;
-
     // Paint objects created once and reused for efficiency
     protected Paint bitmapPaint;
     protected Paint debugTextPaint;
     protected Paint debugLinePaint;
     protected Paint tileBgPaint;
-
     // Volatile fields used to reduce object creation
     protected ScaleAndTranslate satTemp;
     protected Matrix matrix;
     protected RectF sRect;
-    protected final float[] srcArray=new float[8];
-    protected final float[] dstArray=new float[8];
-
-    //The logical density of the display
-    protected final float density;
-
     protected boolean isCallSuperOnDraw;
-
     protected GestureDetector.OnDoubleTapListener onDoubleTapListener;
+    protected boolean isOnImageSource = false;//是否通过ImageSource来加载
+    private volatile boolean isRequestScaleCenter = false;
 
-    // A global preference for bitmap format, available to decoder classes that respect it
-    protected static Bitmap.Config preferredBitmapConfig;
-
-
-    public ScaleImageView(Context context,@Nullable AttributeSet attr,int defStyleAttr) {
+    public ScaleImageView(Context context, @Nullable AttributeSet attr, int defStyleAttr) {
         super(context, attr, defStyleAttr);
         density = getResources().getDisplayMetrics().density;
         setMinimumDpi(160);
@@ -322,10 +274,10 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
         this(context, attr, 0);
     }
 
+
     public ScaleImageView(Context context) {
         this(context, null);
     }
-
 
     public static Bitmap.Config getPreferredBitmapConfig() {
         return preferredBitmapConfig;
@@ -333,17 +285,6 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
 
     public static void setPreferredBitmapConfig(Bitmap.Config preferredBitmapConfig) {
         ScaleImageView.preferredBitmapConfig = preferredBitmapConfig;
-    }
-
-
-    public final void setOrientation(int orientation) {
-        if (!VALID_ORIENTATIONS.contains(orientation)) {
-            throw new IllegalArgumentException("Invalid orientation: " + orientation);
-        }
-        this.orientation = orientation;
-        reset(false);
-        invalidate();
-        requestLayout();
     }
 
     public final void setImage(@NonNull ImageSource imageSource) {
@@ -363,7 +304,7 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
         if (imageSource == null) {
             throw new NullPointerException("imageSource must not be null");
         }
-
+        isOnImageSource = true;
         reset(true);
         if (state != null) {
             restoreState(state);
@@ -422,6 +363,10 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
         }
     }
 
+    public boolean isOnImageSource() {
+        return isOnImageSource;
+    }
+
     protected void reset(boolean newImage) {
         debug("reset newImage=" + newImage);
         scale = 0f;
@@ -465,22 +410,22 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
             if (bitmap != null && bitmapIsCached && onImageEventListener != null) {
                 onImageEventListener.onPreviewReleased();
             }
-            sWidth=0;
-            sHeight=0;
-            sOrientation=0;
-            sRegion=null;
-            pRegion=null;
-            readySent=false;
-            imageLoadedSent=false;
-            bitmap=null;
-            bitmapIsPreview=false;
-            bitmapIsCached=false;
+            sWidth = 0;
+            sHeight = 0;
+            sOrientation = 0;
+            sRegion = null;
+            pRegion = null;
+            readySent = false;
+            imageLoadedSent = false;
+            bitmap = null;
+            bitmapIsPreview = false;
+            bitmapIsCached = false;
         }
-        if(tileMap!=null){
-            for(Map.Entry<Integer,List<Tile>> tileMapEntry: tileMap.entrySet()){
-                for(Tile tile: tileMapEntry.getValue()){
-                    tile.visible=false;
-                    if(tile.bitmap!=null){
+        if (tileMap != null) {
+            for (Map.Entry<Integer, List<Tile>> tileMapEntry : tileMap.entrySet()) {
+                for (Tile tile : tileMapEntry.getValue()) {
+                    tile.visible = false;
+                    if (tile.bitmap != null) {
                         tile.bitmap.recycle();
                         tile.bitmap = null;
                     }
@@ -496,6 +441,7 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
             this.detector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
                 @Override
                 public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+
                     if (panEnabled && readySent && vTranslate != null && e1 != null && e2 != null && (Math.abs(e1.getX() - e2.getX()) > 50 ||
                             Math.abs(e1.getY() - e2.getY()) > 50) &&
                             (Math.abs(velocityX) > 500 || Math.abs(velocityY) > 500) && !isZooming) {
@@ -512,47 +458,47 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
                 }
 
                 @Override
-                public boolean onSingleTapConfirmed(MotionEvent e){
+                public boolean onSingleTapConfirmed(MotionEvent e) {
                     performClick();
-                    final float x=e.getX(), y=e.getY();
-                    if(mViewTapListener!=null){
-                        mViewTapListener.onViewTap(ScaleImageView.this,x,y);
+                    final float x = e.getX(), y = e.getY();
+                    if (mViewTapListener != null) {
+                        mViewTapListener.onViewTap(ScaleImageView.this, x, y);
                     }
-                    if(onDoubleTapListener!=null){
+                    if (onDoubleTapListener != null) {
                         onDoubleTapListener.onSingleTapConfirmed(e);
                     }
                     return true;
                 }
 
                 @Override
-                public boolean onDoubleTap(MotionEvent e){
+                public boolean onDoubleTap(MotionEvent e) {
 
-                    if(onDoubleTapListener!=null){
+                    if (onDoubleTapListener != null) {
                         onDoubleTapListener.onDoubleTap(e);
                     }
-                    if(zoomEnabled&&readySent&&vTranslate!=null){
+                    if (zoomEnabled && readySent && vTranslate != null) {
                         // Hacky solution for #15 - after a double tap the GestureDetector gets in a state
                         // where the next fling is ignored, so here we replace it with a new one.
 //                    setGestureDetector(context);
-                        if(quickScaleEnabled){
+                        if (quickScaleEnabled) {
                             // Store quick scale params. This will become either a double tap zoom or a
                             // quick scale depending on whether the user swipes.
-                            vCenterStart=new PointF(e.getX(),e.getY());
-                            vTranslateStart=new PointF(vTranslate.x,vTranslate.y);
-                            scaleStart=scale;
-                            isQuickScaling=true;
-                            isZooming=true;
-                            quickScaleLastDistance=-1F;
-                            quickScaleSCenter=viewToSourceCoord(vCenterStart);
-                            quickScaleVStart=new PointF(e.getX(),e.getY());
-                            quickScaleVLastPoint=new PointF(quickScaleSCenter.x,quickScaleSCenter.y);
-                            quickScaleMoved=false;
+                            vCenterStart = new PointF(e.getX(), e.getY());
+                            vTranslateStart = new PointF(vTranslate.x, vTranslate.y);
+                            scaleStart = scale;
+                            isQuickScaling = true;
+                            isZooming = true;
+                            quickScaleLastDistance = -1F;
+                            quickScaleSCenter = viewToSourceCoord(vCenterStart);
+                            quickScaleVStart = new PointF(e.getX(), e.getY());
+                            quickScaleVLastPoint = new PointF(quickScaleSCenter.x, quickScaleSCenter.y);
+                            quickScaleMoved = false;
                             // We need to get events in onTouchEvent after this.
                             return false;
-                        } else{
+                        } else {
                             // Start double tap zoom animation.
-                            doubleTapZoom(viewToSourceCoord(new PointF(e.getX(),e.getY())),
-                                          new PointF(e.getX(),e.getY()));
+                            doubleTapZoom(viewToSourceCoord(new PointF(e.getX(), e.getY())),
+                                    new PointF(e.getX(), e.getY()));
                             return true;
                         }
                     }
@@ -560,8 +506,8 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
                 }
 
                 @Override
-                public boolean onDoubleTapEvent(MotionEvent e){
-                    if(onDoubleTapListener!=null){
+                public boolean onDoubleTapEvent(MotionEvent e) {
+                    if (onDoubleTapListener != null) {
                         return onDoubleTapListener.onDoubleTapEvent(e);
                     }
                     return super.onDoubleTapEvent(e);
@@ -569,24 +515,24 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
 
             });
         }
-        if(singleDetector==null){
-            singleDetector=new GestureDetector(context,new GestureDetector.SimpleOnGestureListener(){
+        if (singleDetector == null) {
+            singleDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
                 @Override
-                public boolean onSingleTapConfirmed(MotionEvent e){
+                public boolean onSingleTapConfirmed(MotionEvent e) {
                     performClick();
-                    final float x=e.getX(), y=e.getY();
-                    if(mViewTapListener!=null){
-                        mViewTapListener.onViewTap(ScaleImageView.this,x,y);
+                    final float x = e.getX(), y = e.getY();
+                    if (mViewTapListener != null) {
+                        mViewTapListener.onViewTap(ScaleImageView.this, x, y);
                     }
-                    if(onDoubleTapListener!=null){
+                    if (onDoubleTapListener != null) {
                         return onDoubleTapListener.onSingleTapConfirmed(e);
                     }
                     return true;
                 }
 
                 @Override
-                public boolean onDoubleTap(MotionEvent e){
-                    if(onDoubleTapListener!=null){
+                public boolean onDoubleTap(MotionEvent e) {
+                    if (onDoubleTapListener != null) {
                         return onDoubleTapListener.onDoubleTap(e);
                     }
                     return super.onDoubleTap(e);
@@ -690,7 +636,6 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
         return handled || super.onTouchEvent(event);
     }
 
-    @SuppressWarnings("deprecation")
     protected boolean onTouchEventInternal(@NonNull MotionEvent event) {
         int touchCount = event.getPointerCount();
         switch (event.getAction()) {
@@ -714,160 +659,158 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
                     }
                     // Cancel long click timer
                     handler.removeMessages(MESSAGE_LONG_CLICK);
-                } else if(!isQuickScaling){
+                } else if (!isQuickScaling) {
                     // Start one-finger pan
-                    vTranslateStart.set(vTranslate.x,vTranslate.y);
-                    vCenterStart.set(event.getX(),event.getY());
+                    vTranslateStart.set(vTranslate.x, vTranslate.y);
+                    vCenterStart.set(event.getX(), event.getY());
 
                     // Start long click timer
-                    handler.sendEmptyMessageDelayed(MESSAGE_LONG_CLICK,600);
+                    handler.sendEmptyMessageDelayed(MESSAGE_LONG_CLICK, 600);
                 }
                 return true;
             case MotionEvent.ACTION_MOVE:
-                boolean consumed=false;
-                if(maxTouchCount>0){
-                    if(touchCount >= 2){
+            case MotionEvent.ACTION_HOVER_MOVE:
+                boolean consumed = false;
+                if (maxTouchCount > 0) {
+                    if (touchCount >= 2) {
                         // Calculate new distance between touch points, to scale and pan relative to start values.
-                        float vDistEnd=distance(event.getX(0),event.getX(1),event.getY(0),event.getY(1));
-                        float vCenterEndX=(event.getX(0)+event.getX(1))/2;
-                        float vCenterEndY=(event.getY(0)+event.getY(1))/2;
+                        float vDistEnd = distance(event.getX(0), event.getX(1), event.getY(0), event.getY(1));
+                        float vCenterEndX = (event.getX(0) + event.getX(1)) / 2;
+                        float vCenterEndY = (event.getY(0) + event.getY(1)) / 2;
 
-                        if(zoomEnabled&&(distance(vCenterStart.x,vCenterEndX,vCenterStart.y,vCenterEndY)>5||Math.abs(
-                                vDistEnd-vDistStart)>5||isPanning))
-                        {
-                            isZooming=true;
-                            isPanning=true;
-                            consumed=true;
+                        if (zoomEnabled && (distance(vCenterStart.x, vCenterEndX, vCenterStart.y, vCenterEndY) > 5 || Math.abs(
+                                vDistEnd - vDistStart) > 5 || isPanning)) {
+                            isZooming = true;
+                            isPanning = true;
+                            consumed = true;
 
-                            double previousScale=scale;
-                            scale=Math.min(maxScale,(vDistEnd/vDistStart)*scaleStart);
+                            double previousScale = scale;
+                            scale = Math.min(maxScale, (vDistEnd / vDistStart) * scaleStart);
 
-                            if(scale<=minScale()){
+                            if (scale <= minScale()) {
                                 // Minimum scale reached so don't pan. Adjust start settings so any expand will zoom in.
-                                vDistStart=vDistEnd;
-                                scaleStart=minScale();
-                                vCenterStart.set(vCenterEndX,vCenterEndY);
+                                vDistStart = vDistEnd;
+                                scaleStart = minScale();
+                                vCenterStart.set(vCenterEndX, vCenterEndY);
                                 vTranslateStart.set(vTranslate);
-                            } else if(panEnabled){
+                            } else if (panEnabled) {
                                 // Translate to place the source image coordinate that was at the center of the pinch at the start
                                 // at the center of the pinch now, to give simultaneous pan + zoom.
-                                float vLeftStart=vCenterStart.x-vTranslateStart.x;
-                                float vTopStart=vCenterStart.y-vTranslateStart.y;
-                                float vLeftNow=vLeftStart*(scale/scaleStart);
-                                float vTopNow=vTopStart*(scale/scaleStart);
-                                vTranslate.x=vCenterEndX-vLeftNow;
-                                vTranslate.y=vCenterEndY-vTopNow;
-                                if((previousScale*sHeight()<getHeight()&&scale*sHeight() >= getHeight())||
-                                   (previousScale*sWidth()<getWidth()&&scale*sWidth() >= getWidth()))
-                                {
+                                float vLeftStart = vCenterStart.x - vTranslateStart.x;
+                                float vTopStart = vCenterStart.y - vTranslateStart.y;
+                                float vLeftNow = vLeftStart * (scale / scaleStart);
+                                float vTopNow = vTopStart * (scale / scaleStart);
+                                vTranslate.x = vCenterEndX - vLeftNow;
+                                vTranslate.y = vCenterEndY - vTopNow;
+                                if ((previousScale * sHeight() < getHeight() && scale * sHeight() >= getHeight()) ||
+                                        (previousScale * sWidth() < getWidth() && scale * sWidth() >= getWidth())) {
                                     fitToBounds(true);
-                                    vCenterStart.set(vCenterEndX,vCenterEndY);
+                                    vCenterStart.set(vCenterEndX, vCenterEndY);
                                     vTranslateStart.set(vTranslate);
-                                    scaleStart=scale;
-                                    vDistStart=vDistEnd;
+                                    scaleStart = scale;
+                                    vDistStart = vDistEnd;
                                 }
-                            } else if(sRequestedCenter!=null){
+                            } else if (sRequestedCenter != null) {
                                 // With a center specified from code, zoom around that point.
-                                vTranslate.x=(getWidth()/2)-(scale*sRequestedCenter.x);
-                                vTranslate.y=(getHeight()/2)-(scale*sRequestedCenter.y);
-                            } else{
+                                vTranslate.x = (getWidth() / 2) - (scale * sRequestedCenter.x);
+                                vTranslate.y = (getHeight() / 2) - (scale * sRequestedCenter.y);
+                            } else {
                                 // With no requested center, scale around the image center.
-                                vTranslate.x=(getWidth()/2)-(scale*(sWidth()/2));
-                                vTranslate.y=(getHeight()/2)-(scale*(sHeight()/2));
+                                vTranslate.x = (getWidth() / 2) - (scale * (sWidth() / 2));
+                                vTranslate.y = (getHeight() / 2) - (scale * (sHeight() / 2));
                             }
 
                             fitToBounds(true);
                             refreshRequiredTiles(eagerLoadingEnabled);
                         }
-                    } else if(isQuickScaling){
+                    } else if (isQuickScaling) {
                         // One finger zoom
                         // Stole Google's Magical Formula™ to make sure it feels the exact same
-                        float dist=Math.abs(quickScaleVStart.y-event.getY())*2+quickScaleThreshold;
+                        float dist = Math.abs(quickScaleVStart.y - event.getY()) * 2 + quickScaleThreshold;
 
-                        if(quickScaleLastDistance==-1f){
-                            quickScaleLastDistance=dist;
+                        if (quickScaleLastDistance == -1f) {
+                            quickScaleLastDistance = dist;
                         }
-                        boolean isUpwards=event.getY()>quickScaleVLastPoint.y;
-                        quickScaleVLastPoint.set(0,event.getY());
+                        boolean isUpwards = event.getY() > quickScaleVLastPoint.y;
+                        quickScaleVLastPoint.set(0, event.getY());
 
-                        float spanDiff=Math.abs(1-(dist/quickScaleLastDistance))*0.5f;
+                        float spanDiff = Math.abs(1 - (dist / quickScaleLastDistance)) * 0.5f;
 
-                        if(spanDiff>0.03f||quickScaleMoved){
-                            quickScaleMoved=true;
+                        if (spanDiff > 0.03f || quickScaleMoved) {
+                            quickScaleMoved = true;
 
-                            float multiplier=1;
-                            if(quickScaleLastDistance>0){
-                                multiplier=isUpwards ? (1+spanDiff) : (1-spanDiff);
+                            float multiplier = 1;
+                            if (quickScaleLastDistance > 0) {
+                                multiplier = isUpwards ? (1 + spanDiff) : (1 - spanDiff);
                             }
 
-                            double previousScale=scale;
-                            scale=Math.max(minScale(),Math.min(maxScale,scale*multiplier));
+                            double previousScale = scale;
+                            scale = Math.max(minScale(), Math.min(maxScale, scale * multiplier));
 
-                            if(panEnabled){
-                                float vLeftStart=vCenterStart.x-vTranslateStart.x;
-                                float vTopStart=vCenterStart.y-vTranslateStart.y;
-                                float vLeftNow=vLeftStart*(scale/scaleStart);
-                                float vTopNow=vTopStart*(scale/scaleStart);
-                                vTranslate.x=vCenterStart.x-vLeftNow;
-                                vTranslate.y=vCenterStart.y-vTopNow;
-                                if((previousScale*sHeight()<getHeight()&&scale*sHeight() >= getHeight())||
-                                   (previousScale*sWidth()<getWidth()&&scale*sWidth() >= getWidth()))
-                                {
+                            if (panEnabled) {
+                                float vLeftStart = vCenterStart.x - vTranslateStart.x;
+                                float vTopStart = vCenterStart.y - vTranslateStart.y;
+                                float vLeftNow = vLeftStart * (scale / scaleStart);
+                                float vTopNow = vTopStart * (scale / scaleStart);
+                                vTranslate.x = vCenterStart.x - vLeftNow;
+                                vTranslate.y = vCenterStart.y - vTopNow;
+                                if ((previousScale * sHeight() < getHeight() && scale * sHeight() >= getHeight()) ||
+                                        (previousScale * sWidth() < getWidth() && scale * sWidth() >= getWidth())) {
                                     fitToBounds(true);
                                     vCenterStart.set(sourceToViewCoord(quickScaleSCenter));
                                     vTranslateStart.set(vTranslate);
-                                    scaleStart=scale;
-                                    dist=0;
+                                    scaleStart = scale;
+                                    dist = 0;
                                 }
-                            } else if(sRequestedCenter!=null){
+                            } else if (sRequestedCenter != null) {
                                 // With a center specified from code, zoom around that point.
-                                vTranslate.x=(getWidth()/2)-(scale*sRequestedCenter.x);
-                                vTranslate.y=(getHeight()/2)-(scale*sRequestedCenter.y);
-                            } else{
+                                vTranslate.x = (getWidth() / 2) - (scale * sRequestedCenter.x);
+                                vTranslate.y = (getHeight() / 2) - (scale * sRequestedCenter.y);
+                            } else {
                                 // With no requested center, scale around the image center.
-                                vTranslate.x=(getWidth()/2)-(scale*(sWidth()/2));
-                                vTranslate.y=(getHeight()/2)-(scale*(sHeight()/2));
+                                vTranslate.x = (getWidth() / 2) - (scale * (sWidth() / 2));
+                                vTranslate.y = (getHeight() / 2) - (scale * (sHeight() / 2));
                             }
                         }
 
-                        quickScaleLastDistance=dist;
+                        quickScaleLastDistance = dist;
 
                         fitToBounds(true);
                         refreshRequiredTiles(eagerLoadingEnabled);
 
-                        consumed=true;
-                    } else if(!isZooming){
+                        consumed = true;
+                    } else if (!isZooming) {
                         // One finger pan - translate the image. We do this calculation even with pan disabled so click
                         // and long click behaviour is preserved.
-                        float dx=Math.abs(event.getX()-vCenterStart.x);
-                        float dy=Math.abs(event.getY()-vCenterStart.y);
+                        float dx = Math.abs(event.getX() - vCenterStart.x);
+                        float dy = Math.abs(event.getY() - vCenterStart.y);
 
                         //On the Samsung S6 long click event does not work, because the dx > 5 usually true
-                        float offset=density*5;
-                        if(dx>offset||dy>offset||isPanning){
-                            consumed=true;
-                            vTranslate.x=vTranslateStart.x+(event.getX()-vCenterStart.x);
-                            vTranslate.y=vTranslateStart.y+(event.getY()-vCenterStart.y);
+                        float offset = density * 5;
+                        if (dx > offset || dy > offset || isPanning) {
+                            consumed = true;
+                            vTranslate.x = vTranslateStart.x + (event.getX() - vCenterStart.x);
+                            vTranslate.y = vTranslateStart.y + (event.getY() - vCenterStart.y);
 
-                            float lastX=vTranslate.x;
-                            float lastY=vTranslate.y;
+                            float lastX = vTranslate.x;
+                            float lastY = vTranslate.y;
                             fitToBounds(true);
-                            boolean atXEdge=lastX!=vTranslate.x;
-                            boolean atYEdge=lastY!=vTranslate.y;
-                            boolean edgeXSwipe=atXEdge&&dx>dy&&!isPanning;
-                            boolean edgeYSwipe=atYEdge&&dy>dx&&!isPanning;
-                            boolean yPan=lastY==vTranslate.y&&dy>offset*3;
-                            if(!edgeXSwipe&&!edgeYSwipe&&(!atXEdge||!atYEdge||yPan||isPanning)){
-                                isPanning=true;
-                            } else if(dx>offset||dy>offset){
+                            boolean atXEdge = lastX != vTranslate.x;
+                            boolean atYEdge = lastY != vTranslate.y;
+                            boolean edgeXSwipe = atXEdge && dx > dy && !isPanning;
+                            boolean edgeYSwipe = atYEdge && dy > dx && !isPanning;
+                            boolean yPan = lastY == vTranslate.y && dy > offset * 3;
+                            if (!edgeXSwipe && !edgeYSwipe && (!atXEdge || !atYEdge || yPan || isPanning)) {
+                                isPanning = true;
+                            } else if (dx > offset || dy > offset) {
                                 // Haven't panned the image, and we're at the left or right edge. Switch to page swipe.
-                                maxTouchCount=0;
+                                maxTouchCount = 0;
                                 handler.removeMessages(MESSAGE_LONG_CLICK);
                                 requestDisallowInterceptTouchEvent(false);
                             }
-                            if(!panEnabled){
-                                vTranslate.x=vTranslateStart.x;
-                                vTranslate.y=vTranslateStart.y;
+                            if (!panEnabled) {
+                                vTranslate.x = vTranslateStart.x;
+                                vTranslate.y = vTranslateStart.y;
                                 requestDisallowInterceptTouchEvent(false);
                             }
 
@@ -875,7 +818,7 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
                         }
                     }
                 }
-                if(consumed){
+                if (consumed) {
                     handler.removeMessages(MESSAGE_LONG_CLICK);
                     invalidate();
                     return true;
@@ -885,13 +828,13 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
             case MotionEvent.ACTION_POINTER_UP:
             case MotionEvent.ACTION_POINTER_2_UP:
                 handler.removeMessages(MESSAGE_LONG_CLICK);
-                if(isQuickScaling){
-                    isQuickScaling=false;
-                    if(!quickScaleMoved){
-                        doubleTapZoom(quickScaleSCenter,vCenterStart);
+                if (isQuickScaling) {
+                    isQuickScaling = false;
+                    if (!quickScaleMoved) {
+                        doubleTapZoom(quickScaleSCenter, vCenterStart);
                     }
                 }
-                if(maxTouchCount>0&&(isZooming||isPanning)){
+                if (maxTouchCount > 0 && (isZooming || isPanning)) {
                     if (isZooming && touchCount == 2) {
                         // Convert from zoom to pan with remaining touch
                         isPanning = true;
@@ -987,7 +930,7 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
             // If image has been loaded or supplied as a bitmap, onDraw may be the first time the view has
             // dimensions and therefore the first opportunity to set scale and translate. If this call returns
             // false there is nothing to be drawn so return immediately.
-            if(!checkReady()){
+            if (!checkReady()) {
                 return;
             }
 
@@ -995,195 +938,203 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
             preDraw();
 
             // If animating scale, calculate current scale and center with easing equations
-            if(anim!=null&&anim.vFocusStart!=null){
+            if (anim != null && anim.vFocusStart != null) {
                 // Store current values so we can send an event if they change
-                float scaleBefore=scale;
-                if(vTranslateBefore==null){ vTranslateBefore=new PointF(0,0); }
+                float scaleBefore = scale;
+                if (vTranslateBefore == null) {
+                    vTranslateBefore = new PointF(0, 0);
+                }
                 vTranslateBefore.set(vTranslate);
 
-                long scaleElapsed=System.currentTimeMillis()-anim.time;
-                boolean finished=scaleElapsed>anim.duration;
-                scaleElapsed=Math.min(scaleElapsed,anim.duration);
-                scale=ease(anim.easing,scaleElapsed,anim.scaleStart,anim.scaleEnd-anim.scaleStart,anim.duration);
+                long scaleElapsed = System.currentTimeMillis() - anim.time;
+                boolean finished = scaleElapsed > anim.duration;
+                scaleElapsed = Math.min(scaleElapsed, anim.duration);
+                scale = ease(anim.easing, scaleElapsed, anim.scaleStart, anim.scaleEnd - anim.scaleStart, anim.duration);
 
                 // Apply required animation to the focal point
-                float vFocusNowX=ease(anim.easing,
-                                      scaleElapsed,
-                                      anim.vFocusStart.x,
-                                      anim.vFocusEnd.x-anim.vFocusStart.x,
-                                      anim.duration);
-                float vFocusNowY=ease(anim.easing,
-                                      scaleElapsed,
-                                      anim.vFocusStart.y,
-                                      anim.vFocusEnd.y-anim.vFocusStart.y,
-                                      anim.duration);
+                float vFocusNowX = ease(anim.easing,
+                        scaleElapsed,
+                        anim.vFocusStart.x,
+                        anim.vFocusEnd.x - anim.vFocusStart.x,
+                        anim.duration);
+                float vFocusNowY = ease(anim.easing,
+                        scaleElapsed,
+                        anim.vFocusStart.y,
+                        anim.vFocusEnd.y - anim.vFocusStart.y,
+                        anim.duration);
                 // Find out where the focal point is at this scale and adjust its position to follow the animation path
-                vTranslate.x-=sourceToViewX(anim.sCenterEnd.x)-vFocusNowX;
-                vTranslate.y-=sourceToViewY(anim.sCenterEnd.y)-vFocusNowY;
+                vTranslate.x -= sourceToViewX(anim.sCenterEnd.x) - vFocusNowX;
+                vTranslate.y -= sourceToViewY(anim.sCenterEnd.y) - vFocusNowY;
 
                 // For translate anims, showing the image non-centered is never allowed, for scaling anims it is during the animation.
-                fitToBounds(finished||(anim.scaleStart==anim.scaleEnd));
-                sendStateChanged(scaleBefore,vTranslateBefore,anim.origin);
+                fitToBounds(finished || (anim.scaleStart == anim.scaleEnd));
+                sendStateChanged(scaleBefore, vTranslateBefore, anim.origin);
                 refreshRequiredTiles(finished);
-                if(finished){
-                    if(anim.listener!=null){
-                        try{
+                if (finished) {
+                    if (anim.listener != null) {
+                        try {
                             anim.listener.onComplete();
-                        } catch(Exception e){
-                            Log.w(TAG,"Error thrown by animation listener",e);
+                        } catch (Exception e) {
+                            Log.w(TAG, "Error thrown by animation listener", e);
                         }
                     }
-                    anim=null;
+                    anim = null;
                 }
                 invalidate();
             }
 
-            if(tileMap!=null&&isBaseLayerReady()){
+            if (tileMap != null && isBaseLayerReady()) {
 
                 // Optimum sample size for current scale
-                int sampleSize=Math.min(fullImageSampleSize,calculateInSampleSize(scale));
+                int sampleSize = Math.min(fullImageSampleSize, calculateInSampleSize(scale));
 
                 // First check for missing tiles - if there are any we need the base layer underneath to avoid gaps
-                boolean hasMissingTiles=false;
-                for(Map.Entry<Integer,List<Tile>> tileMapEntry: tileMap.entrySet()){
-                    if(tileMapEntry.getKey()==sampleSize){
-                        for(Tile tile: tileMapEntry.getValue()){
-                            if(tile.visible&&(tile.loading||tile.bitmap==null)){
-                                hasMissingTiles=true;
+                boolean hasMissingTiles = false;
+                for (Map.Entry<Integer, List<Tile>> tileMapEntry : tileMap.entrySet()) {
+                    if (tileMapEntry.getKey() == sampleSize) {
+                        for (Tile tile : tileMapEntry.getValue()) {
+                            if (tile.visible && (tile.loading || tile.bitmap == null)) {
+                                hasMissingTiles = true;
                             }
                         }
                     }
                 }
 
                 // Render all loaded tiles. LinkedHashMap used for bottom up rendering - lower res tiles underneath.
-                for(Map.Entry<Integer,List<Tile>> tileMapEntry: tileMap.entrySet()){
-                    if(tileMapEntry.getKey()==sampleSize||hasMissingTiles){
-                        for(Tile tile: tileMapEntry.getValue()){
-                            sourceToViewRect(tile.sRect,tile.vRect);
-                            if(!tile.loading&&tile.bitmap!=null){
-                                if(tileBgPaint!=null){
-                                    canvas.drawRect(tile.vRect,tileBgPaint);
+                for (Map.Entry<Integer, List<Tile>> tileMapEntry : tileMap.entrySet()) {
+                    if (tileMapEntry.getKey() == sampleSize || hasMissingTiles) {
+                        for (Tile tile : tileMapEntry.getValue()) {
+                            sourceToViewRect(tile.sRect, tile.vRect);
+                            if (!tile.loading && tile.bitmap != null) {
+                                if (tileBgPaint != null) {
+                                    canvas.drawRect(tile.vRect, tileBgPaint);
                                 }
-                                if(matrix==null){ matrix=new Matrix(); }
+                                if (matrix == null) {
+                                    matrix = new Matrix();
+                                }
                                 matrix.reset();
                                 setMatrixArray(srcArray,
-                                               0,
-                                               0,
-                                               tile.bitmap.getWidth(),
-                                               0,
-                                               tile.bitmap.getWidth(),
-                                               tile.bitmap.getHeight(),
-                                               0,
-                                               tile.bitmap.getHeight());
-                                if(getRequiredRotation()==ORIENTATION_0){
+                                        0,
+                                        0,
+                                        tile.bitmap.getWidth(),
+                                        0,
+                                        tile.bitmap.getWidth(),
+                                        tile.bitmap.getHeight(),
+                                        0,
+                                        tile.bitmap.getHeight());
+                                if (getRequiredRotation() == ORIENTATION_0) {
                                     setMatrixArray(dstArray,
-                                                   tile.vRect.left,
-                                                   tile.vRect.top,
-                                                   tile.vRect.right,
-                                                   tile.vRect.top,
-                                                   tile.vRect.right,
-                                                   tile.vRect.bottom,
-                                                   tile.vRect.left,
-                                                   tile.vRect.bottom);
-                                } else if(getRequiredRotation()==ORIENTATION_90){
+                                            tile.vRect.left,
+                                            tile.vRect.top,
+                                            tile.vRect.right,
+                                            tile.vRect.top,
+                                            tile.vRect.right,
+                                            tile.vRect.bottom,
+                                            tile.vRect.left,
+                                            tile.vRect.bottom);
+                                } else if (getRequiredRotation() == ORIENTATION_90) {
                                     setMatrixArray(dstArray,
-                                                   tile.vRect.right,
-                                                   tile.vRect.top,
-                                                   tile.vRect.right,
-                                                   tile.vRect.bottom,
-                                                   tile.vRect.left,
-                                                   tile.vRect.bottom,
-                                                   tile.vRect.left,
-                                                   tile.vRect.top);
-                                } else if(getRequiredRotation()==ORIENTATION_180){
+                                            tile.vRect.right,
+                                            tile.vRect.top,
+                                            tile.vRect.right,
+                                            tile.vRect.bottom,
+                                            tile.vRect.left,
+                                            tile.vRect.bottom,
+                                            tile.vRect.left,
+                                            tile.vRect.top);
+                                } else if (getRequiredRotation() == ORIENTATION_180) {
                                     setMatrixArray(dstArray,
-                                                   tile.vRect.right,
-                                                   tile.vRect.bottom,
-                                                   tile.vRect.left,
-                                                   tile.vRect.bottom,
-                                                   tile.vRect.left,
-                                                   tile.vRect.top,
-                                                   tile.vRect.right,
-                                                   tile.vRect.top);
-                                } else if(getRequiredRotation()==ORIENTATION_270){
+                                            tile.vRect.right,
+                                            tile.vRect.bottom,
+                                            tile.vRect.left,
+                                            tile.vRect.bottom,
+                                            tile.vRect.left,
+                                            tile.vRect.top,
+                                            tile.vRect.right,
+                                            tile.vRect.top);
+                                } else if (getRequiredRotation() == ORIENTATION_270) {
                                     setMatrixArray(dstArray,
-                                                   tile.vRect.left,
-                                                   tile.vRect.bottom,
-                                                   tile.vRect.left,
-                                                   tile.vRect.top,
-                                                   tile.vRect.right,
-                                                   tile.vRect.top,
-                                                   tile.vRect.right,
-                                                   tile.vRect.bottom);
+                                            tile.vRect.left,
+                                            tile.vRect.bottom,
+                                            tile.vRect.left,
+                                            tile.vRect.top,
+                                            tile.vRect.right,
+                                            tile.vRect.top,
+                                            tile.vRect.right,
+                                            tile.vRect.bottom);
                                 }
-                                matrix.setPolyToPoly(srcArray,0,dstArray,0,4);
-                                canvas.drawBitmap(tile.bitmap,matrix,bitmapPaint);
-                                if(debug){
-                                    canvas.drawRect(tile.vRect,debugLinePaint);
+                                matrix.setPolyToPoly(srcArray, 0, dstArray, 0, 4);
+                                canvas.drawBitmap(tile.bitmap, matrix, bitmapPaint);
+                                if (debug) {
+                                    canvas.drawRect(tile.vRect, debugLinePaint);
                                 }
-                            } else if(tile.loading&&debug){
-                                canvas.drawText("LOADING",tile.vRect.left+px(5),tile.vRect.top+px(35),debugTextPaint);
+                            } else if (tile.loading && debug) {
+                                canvas.drawText("LOADING", tile.vRect.left + px(5), tile.vRect.top + px(35), debugTextPaint);
                             }
-                            if(tile.visible&&debug){
-                                canvas.drawText("ISS "+tile.sampleSize+" RECT "+tile.sRect.top+","+tile.sRect.left+","+
-                                                tile.sRect.bottom+","+tile.sRect.right,
-                                                tile.vRect.left+px(5),
-                                                tile.vRect.top+px(15),
-                                                debugTextPaint);
+                            if (tile.visible && debug) {
+                                canvas.drawText("ISS " + tile.sampleSize + " RECT " + tile.sRect.top + "," + tile.sRect.left + "," +
+                                                tile.sRect.bottom + "," + tile.sRect.right,
+                                        tile.vRect.left + px(5),
+                                        tile.vRect.top + px(15),
+                                        debugTextPaint);
                             }
                         }
                     }
                 }
 
-            } else if(bitmap!=null&&!bitmap.isRecycled()){
+            } else if (bitmap != null && !bitmap.isRecycled()) {
 
-                float xScale=scale, yScale=scale;
-                if(bitmapIsPreview){
-                    xScale=scale*((float)sWidth/bitmap.getWidth());
-                    yScale=scale*((float)sHeight/bitmap.getHeight());
+                float xScale = scale, yScale = scale;
+                if (bitmapIsPreview) {
+                    xScale = scale * ((float) sWidth / bitmap.getWidth());
+                    yScale = scale * ((float) sHeight / bitmap.getHeight());
                 }
 
-                if(matrix==null){ matrix=new Matrix(); }
+                if (matrix == null) {
+                    matrix = new Matrix();
+                }
                 matrix.reset();
-                matrix.postScale(xScale,yScale);
+                matrix.postScale(xScale, yScale);
                 matrix.postRotate(getRequiredRotation());
-                matrix.postTranslate(vTranslate.x,vTranslate.y);
+                matrix.postTranslate(vTranslate.x, vTranslate.y);
 
-                if(getRequiredRotation()==ORIENTATION_180){
-                    matrix.postTranslate(scale*sWidth,scale*sHeight);
-                } else if(getRequiredRotation()==ORIENTATION_90){
-                    matrix.postTranslate(scale*sHeight,0);
-                } else if(getRequiredRotation()==ORIENTATION_270){
-                    matrix.postTranslate(0,scale*sWidth);
+                if (getRequiredRotation() == ORIENTATION_180) {
+                    matrix.postTranslate(scale * sWidth, scale * sHeight);
+                } else if (getRequiredRotation() == ORIENTATION_90) {
+                    matrix.postTranslate(scale * sHeight, 0);
+                } else if (getRequiredRotation() == ORIENTATION_270) {
+                    matrix.postTranslate(0, scale * sWidth);
                 }
 
-                if(tileBgPaint!=null){
-                    if(sRect==null){ sRect=new RectF(); }
+                if (tileBgPaint != null) {
+                    if (sRect == null) {
+                        sRect = new RectF();
+                    }
                     sRect.set(0f,
-                              0f,
-                              bitmapIsPreview ? bitmap.getWidth() : sWidth,
-                              bitmapIsPreview ? bitmap.getHeight() : sHeight);
+                            0f,
+                            bitmapIsPreview ? bitmap.getWidth() : sWidth,
+                            bitmapIsPreview ? bitmap.getHeight() : sHeight);
                     matrix.mapRect(sRect);
-                    canvas.drawRect(sRect,tileBgPaint);
+                    canvas.drawRect(sRect, tileBgPaint);
                 }
-                canvas.drawBitmap(bitmap,matrix,bitmapPaint);
+                canvas.drawBitmap(bitmap, matrix, bitmapPaint);
 
             }
 
-            if(debug){
-                canvas.drawText("Scale: "+String.format(Locale.ENGLISH,"%.2f",scale)+" ("+
-                                String.format(Locale.ENGLISH,"%.2f",minScale())+" - "+
-                                String.format(Locale.ENGLISH,"%.2f",maxScale)+")",px(5),px(15),debugTextPaint);
-                canvas.drawText("Translate: "+String.format(Locale.ENGLISH,"%.2f",vTranslate.x)+":"+
-                                String.format(Locale.ENGLISH,"%.2f",vTranslate.y),px(5),px(30),debugTextPaint);
-                PointF center=getCenter();
+            if (debug) {
+                canvas.drawText("Scale: " + String.format(Locale.ENGLISH, "%.2f", scale) + " (" +
+                        String.format(Locale.ENGLISH, "%.2f", minScale()) + " - " +
+                        String.format(Locale.ENGLISH, "%.2f", maxScale) + ")", px(5), px(15), debugTextPaint);
+                canvas.drawText("Translate: " + String.format(Locale.ENGLISH, "%.2f", vTranslate.x) + ":" +
+                        String.format(Locale.ENGLISH, "%.2f", vTranslate.y), px(5), px(30), debugTextPaint);
+                PointF center = getCenter();
                 //noinspection ConstantConditions
-                canvas.drawText("Source center: "+String.format(Locale.ENGLISH,"%.2f",center.x)+":"+
-                                String.format(Locale.ENGLISH,"%.2f",center.y),px(5),px(45),debugTextPaint);
-                if(anim!=null){
-                    PointF vCenterStart=sourceToViewCoord(anim.sCenterStart);
-                    PointF vCenterEndRequested=sourceToViewCoord(anim.sCenterEndRequested);
-                    PointF vCenterEnd=sourceToViewCoord(anim.sCenterEnd);
+                canvas.drawText("Source center: " + String.format(Locale.ENGLISH, "%.2f", center.x) + ":" +
+                        String.format(Locale.ENGLISH, "%.2f", center.y), px(5), px(45), debugTextPaint);
+                if (anim != null) {
+                    PointF vCenterStart = sourceToViewCoord(anim.sCenterStart);
+                    PointF vCenterEndRequested = sourceToViewCoord(anim.sCenterEndRequested);
+                    PointF vCenterEnd = sourceToViewCoord(anim.sCenterEnd);
                     //noinspection ConstantConditions
                     canvas.drawCircle(vCenterStart.x, vCenterStart.y, px(10), debugLinePaint);
                     debugLinePaint.setColor(Color.RED);
@@ -1710,6 +1661,7 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
 
     @Override
     public void setImageBitmap(Bitmap bm) {
+        isOnImageSource = false;
         isCallSuperOnDraw = true;
         if (bitmap != null) {
             bitmap.recycle();
@@ -1745,6 +1697,7 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
 
     @Override
     public void setImageURI(Uri uri) {
+        isOnImageSource = false;
         isCallSuperOnDraw = true;
         if (bitmap != null) {
             bitmap.recycle();
@@ -1765,6 +1718,7 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
 
     @Override
     public void setImageResource(int resId) {
+        isOnImageSource = false;
         isCallSuperOnDraw = true;
         if (bitmap != null) {
             bitmap.recycle();
@@ -1785,687 +1739,638 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
 
     @SuppressWarnings("SuspiciousNameCombination")
     @AnyThread
-    protected void fileSRect(Rect sRect,Rect target){
-        if(getRequiredRotation()==0){
+    protected void fileSRect(Rect sRect, Rect target) {
+        if (getRequiredRotation() == 0) {
             target.set(sRect);
-        } else if(getRequiredRotation()==90){
-            target.set(sRect.top,sHeight-sRect.right,sRect.bottom,sHeight-sRect.left);
-        } else if(getRequiredRotation()==180){
-            target.set(sWidth-sRect.right,sHeight-sRect.bottom,sWidth-sRect.left,sHeight-sRect.top);
-        } else{
-            target.set(sWidth-sRect.bottom,sRect.left,sWidth-sRect.top,sRect.right);
+        } else if (getRequiredRotation() == 90) {
+            target.set(sRect.top, sHeight - sRect.right, sRect.bottom, sHeight - sRect.left);
+        } else if (getRequiredRotation() == 180) {
+            target.set(sWidth - sRect.right, sHeight - sRect.bottom, sWidth - sRect.left, sHeight - sRect.top);
+        } else {
+            target.set(sWidth - sRect.bottom, sRect.left, sWidth - sRect.top, sRect.right);
         }
     }
 
     @AnyThread
-    protected int getRequiredRotation(){
-        if(orientation==ORIENTATION_USE_EXIF){
+    protected int getRequiredRotation() {
+        if (orientation == ORIENTATION_USE_EXIF) {
             return sOrientation;
-        } else{
+        } else {
             return orientation;
         }
     }
 
-    protected float distance(float x0,float x1,float y0,float y1){
-        float x=x0-x1;
-        float y=y0-y1;
-        return (float)Math.sqrt(x*x+y*y);
+    protected float distance(float x0, float x1, float y0, float y1) {
+        float x = x0 - x1;
+        float y = y0 - y1;
+        return (float) Math.sqrt(x * x + y * y);
     }
 
-    public void recycle(){
+    public void recycle() {
         reset(true);
-        bitmapPaint=null;
-        debugTextPaint=null;
-        debugLinePaint=null;
-        tileBgPaint=null;
+        bitmapPaint = null;
+        debugTextPaint = null;
+        debugLinePaint = null;
+        tileBgPaint = null;
     }
 
-    protected float viewToSourceX(float vx){
-        if(vTranslate==null){ return Float.NaN; }
-        return (vx-vTranslate.x)/scale;
+    protected float viewToSourceX(float vx) {
+        if (vTranslate == null) {
+            return Float.NaN;
+        }
+        return (vx - vTranslate.x) / scale;
     }
 
-    protected float viewToSourceY(float vy){
-        if(vTranslate==null){ return Float.NaN; }
-        return (vy-vTranslate.y)/scale;
+    protected float viewToSourceY(float vy) {
+        if (vTranslate == null) {
+            return Float.NaN;
+        }
+        return (vy - vTranslate.y) / scale;
     }
 
-    public void viewToFileRect(Rect vRect,Rect fRect){
-        if(vTranslate==null||!readySent){
+    public void viewToFileRect(Rect vRect, Rect fRect) {
+        if (vTranslate == null || !readySent) {
             return;
         }
-        fRect.set((int)viewToSourceX(vRect.left),
-                  (int)viewToSourceY(vRect.top),
-                  (int)viewToSourceX(vRect.right),
-                  (int)viewToSourceY(vRect.bottom));
-        fileSRect(fRect,fRect);
-        fRect.set(Math.max(0,fRect.left),
-                  Math.max(0,fRect.top),
-                  Math.min(sWidth,fRect.right),
-                  Math.min(sHeight,fRect.bottom));
-        if(sRegion!=null){
-            fRect.offset(sRegion.left,sRegion.top);
+        fRect.set((int) viewToSourceX(vRect.left),
+                (int) viewToSourceY(vRect.top),
+                (int) viewToSourceX(vRect.right),
+                (int) viewToSourceY(vRect.bottom));
+        fileSRect(fRect, fRect);
+        fRect.set(Math.max(0, fRect.left),
+                Math.max(0, fRect.top),
+                Math.min(sWidth, fRect.right),
+                Math.min(sHeight, fRect.bottom));
+        if (sRegion != null) {
+            fRect.offset(sRegion.left, sRegion.top);
         }
     }
 
-    public void visibleFileRect(Rect fRect){
-        if(vTranslate==null||!readySent){
+    public void visibleFileRect(Rect fRect) {
+        if (vTranslate == null || !readySent) {
             return;
         }
-        fRect.set(0,0,getWidth(),getHeight());
-        viewToFileRect(fRect,fRect);
+        fRect.set(0, 0, getWidth(), getHeight());
+        viewToFileRect(fRect, fRect);
     }
 
     @Nullable
-    public final PointF viewToSourceCoord(PointF vxy){
-        return viewToSourceCoord(vxy.x,vxy.y,new PointF());
+    public final PointF viewToSourceCoord(PointF vxy) {
+        return viewToSourceCoord(vxy.x, vxy.y, new PointF());
     }
 
     @Nullable
-    public final PointF viewToSourceCoord(float vx,float vy){
-        return viewToSourceCoord(vx,vy,new PointF());
+    public final PointF viewToSourceCoord(float vx, float vy) {
+        return viewToSourceCoord(vx, vy, new PointF());
     }
 
     @Nullable
-    public final PointF viewToSourceCoord(PointF vxy,@NonNull PointF sTarget){
-        return viewToSourceCoord(vxy.x,vxy.y,sTarget);
+    public final PointF viewToSourceCoord(PointF vxy, @NonNull PointF sTarget) {
+        return viewToSourceCoord(vxy.x, vxy.y, sTarget);
     }
 
     @Nullable
-    public final PointF viewToSourceCoord(float vx,float vy,@NonNull PointF sTarget){
-        if(vTranslate==null){
+    public final PointF viewToSourceCoord(float vx, float vy, @NonNull PointF sTarget) {
+        if (vTranslate == null) {
             return null;
         }
-        sTarget.set(viewToSourceX(vx),viewToSourceY(vy));
+        sTarget.set(viewToSourceX(vx), viewToSourceY(vy));
         return sTarget;
     }
 
-    protected float sourceToViewX(float sx){
-        if(vTranslate==null){ return Float.NaN; }
-        return (sx*scale)+vTranslate.x;
+    protected float sourceToViewX(float sx) {
+        if (vTranslate == null) {
+            return Float.NaN;
+        }
+        return (sx * scale) + vTranslate.x;
     }
 
-    protected float sourceToViewY(float sy){
-        if(vTranslate==null){ return Float.NaN; }
-        return (sy*scale)+vTranslate.y;
+    protected float sourceToViewY(float sy) {
+        if (vTranslate == null) {
+            return Float.NaN;
+        }
+        return (sy * scale) + vTranslate.y;
     }
 
     @Nullable
-    public final PointF sourceToViewCoord(PointF sxy){
-        return sourceToViewCoord(sxy.x,sxy.y,new PointF());
+    public final PointF sourceToViewCoord(PointF sxy) {
+        return sourceToViewCoord(sxy.x, sxy.y, new PointF());
     }
 
     @Nullable
-    public final PointF sourceToViewCoord(float sx,float sy){
-        return sourceToViewCoord(sx,sy,new PointF());
+    public final PointF sourceToViewCoord(float sx, float sy) {
+        return sourceToViewCoord(sx, sy, new PointF());
     }
 
     @SuppressWarnings("UnusedReturnValue")
     @Nullable
-    public final PointF sourceToViewCoord(PointF sxy,@NonNull PointF vTarget){
-        return sourceToViewCoord(sxy.x,sxy.y,vTarget);
+    public final PointF sourceToViewCoord(PointF sxy, @NonNull PointF vTarget) {
+        return sourceToViewCoord(sxy.x, sxy.y, vTarget);
     }
 
     @Nullable
-    public final PointF sourceToViewCoord(float sx,float sy,@NonNull PointF vTarget){
-        if(vTranslate==null){
+    public final PointF sourceToViewCoord(float sx, float sy, @NonNull PointF vTarget) {
+        if (vTranslate == null) {
             return null;
         }
-        vTarget.set(sourceToViewX(sx),sourceToViewY(sy));
+        vTarget.set(sourceToViewX(sx), sourceToViewY(sy));
         return vTarget;
     }
 
-    protected void sourceToViewRect(@NonNull Rect sRect,@NonNull Rect vTarget){
-        vTarget.set((int)sourceToViewX(sRect.left),
-                    (int)sourceToViewY(sRect.top),
-                    (int)sourceToViewX(sRect.right),
-                    (int)sourceToViewY(sRect.bottom));
+    protected void sourceToViewRect(@NonNull Rect sRect, @NonNull Rect vTarget) {
+        vTarget.set((int) sourceToViewX(sRect.left),
+                (int) sourceToViewY(sRect.top),
+                (int) sourceToViewX(sRect.right),
+                (int) sourceToViewY(sRect.bottom));
     }
 
     @NonNull
-    protected PointF vTranslateForSCenter(float sCenterX,float sCenterY,float scale){
-        int vxCenter=getPaddingLeft()+(getWidth()-getPaddingRight()-getPaddingLeft())/2;
-        int vyCenter=getPaddingTop()+(getHeight()-getPaddingBottom()-getPaddingTop())/2;
-        if(satTemp==null){
-            satTemp=new ScaleAndTranslate(0,new PointF(0,0));
+    protected PointF vTranslateForSCenter(float sCenterX, float sCenterY, float scale) {
+        int vxCenter = getPaddingLeft() + (getWidth() - getPaddingRight() - getPaddingLeft()) / 2;
+        int vyCenter = getPaddingTop() + (getHeight() - getPaddingBottom() - getPaddingTop()) / 2;
+        if (satTemp == null) {
+            satTemp = new ScaleAndTranslate(0, new PointF(0, 0));
         }
-        satTemp.scale=scale;
-        satTemp.vTranslate.set(vxCenter-(sCenterX*scale),vyCenter-(sCenterY*scale));
-        fitToBounds(true,satTemp);
+        satTemp.scale = scale;
+        satTemp.vTranslate.set(vxCenter - (sCenterX * scale), vyCenter - (sCenterY * scale));
+        fitToBounds(true, satTemp);
         return satTemp.vTranslate;
     }
 
     @NonNull
-    protected PointF limitedSCenter(float sCenterX,float sCenterY,float scale,@NonNull PointF sTarget){
-        PointF vTranslate=vTranslateForSCenter(sCenterX,sCenterY,scale);
-        int vxCenter=getPaddingLeft()+(getWidth()-getPaddingRight()-getPaddingLeft())/2;
-        int vyCenter=getPaddingTop()+(getHeight()-getPaddingBottom()-getPaddingTop())/2;
-        float sx=(vxCenter-vTranslate.x)/scale;
-        float sy=(vyCenter-vTranslate.y)/scale;
-        sTarget.set(sx,sy);
+    protected PointF limitedSCenter(float sCenterX, float sCenterY, float scale, @NonNull PointF sTarget) {
+        PointF vTranslate = vTranslateForSCenter(sCenterX, sCenterY, scale);
+        int vxCenter = getPaddingLeft() + (getWidth() - getPaddingRight() - getPaddingLeft()) / 2;
+        int vyCenter = getPaddingTop() + (getHeight() - getPaddingBottom() - getPaddingTop()) / 2;
+        float sx = (vxCenter - vTranslate.x) / scale;
+        float sy = (vyCenter - vTranslate.y) / scale;
+        sTarget.set(sx, sy);
         return sTarget;
     }
 
-    protected float minScale(){
-        int vPadding=getPaddingBottom()+getPaddingTop();
-        int hPadding=getPaddingLeft()+getPaddingRight();
-        if(minimumScaleType==SCALE_TYPE_CENTER_CROP||minimumScaleType==SCALE_TYPE_START){
-            return Math.max((getWidth()-hPadding)/(float)sWidth(),(getHeight()-vPadding)/(float)sHeight());
-        } else if(minimumScaleType==SCALE_TYPE_CUSTOM&&minScale>0){
+    protected float minScale() {
+        int vPadding = getPaddingBottom() + getPaddingTop();
+        int hPadding = getPaddingLeft() + getPaddingRight();
+        if (minimumScaleType == SCALE_TYPE_CENTER_CROP || minimumScaleType == SCALE_TYPE_START) {
+            return Math.max((getWidth() - hPadding) / (float) sWidth(), (getHeight() - vPadding) / (float) sHeight());
+        } else if (minimumScaleType == SCALE_TYPE_CUSTOM && minScale > 0) {
             return minScale;
-        } else{
-            return Math.min((getWidth()-hPadding)/(float)sWidth(),(getHeight()-vPadding)/(float)sHeight());
+        } else {
+            return Math.min((getWidth() - hPadding) / (float) sWidth(), (getHeight() - vPadding) / (float) sHeight());
         }
     }
 
-    protected float limitedScale(float targetScale){
-        targetScale=Math.max(minScale(),targetScale);
-        targetScale=Math.min(maxScale,targetScale);
+    protected float limitedScale(float targetScale) {
+        targetScale = Math.max(minScale(), targetScale);
+        targetScale = Math.min(maxScale, targetScale);
         return targetScale;
     }
 
-    protected float ease(int type,long time,float from,float change,long duration){
-        switch(type){
+    protected float ease(int type, long time, float from, float change, long duration) {
+        switch (type) {
             case EASE_IN_OUT_QUAD:
-                return easeInOutQuad(time,from,change,duration);
+                return easeInOutQuad(time, from, change, duration);
             case EASE_OUT_QUAD:
-                return easeOutQuad(time,from,change,duration);
+                return easeOutQuad(time, from, change, duration);
             default:
-                throw new IllegalStateException("Unexpected easing type: "+type);
+                throw new IllegalStateException("Unexpected easing type: " + type);
         }
     }
 
-    protected float easeOutQuad(long time,float from,float change,long duration){
-        float progress=(float)time/(float)duration;
-        return -change*progress*(progress-2)+from;
+    protected float easeOutQuad(long time, float from, float change, long duration) {
+        float progress = (float) time / (float) duration;
+        return -change * progress * (progress - 2) + from;
     }
 
-    protected float easeInOutQuad(long time,float from,float change,long duration){
-        float timeF=time/(duration/2f);
-        if(timeF<1){
-            return (change/2f*timeF*timeF)+from;
-        } else{
+    protected float easeInOutQuad(long time, float from, float change, long duration) {
+        float timeF = time / (duration / 2f);
+        if (timeF < 1) {
+            return (change / 2f * timeF * timeF) + from;
+        } else {
             timeF--;
-            return (-change/2f)*(timeF*(timeF-2)-1)+from;
+            return (-change / 2f) * (timeF * (timeF - 2) - 1) + from;
         }
     }
 
     @AnyThread
-    protected void debug(String message,Object... args){
-        if(debug){
-            Log.d(TAG,String.format(message,args));
+    protected void debug(String message, Object... args) {
+        if (debug) {
+            Log.d(TAG, String.format(message, args));
         }
     }
 
-    protected int px(int px){
-        return (int)(density*px);
+    protected int px(int px) {
+        return (int) (density * px);
     }
 
-    public final void setRegionDecoderClass(@NonNull Class<? extends ImageRegionDecoder> regionDecoderClass){
+    public final void setRegionDecoderClass(@NonNull Class<? extends ImageRegionDecoder> regionDecoderClass) {
         //noinspection ConstantConditions
-        if(regionDecoderClass==null){
+        if (regionDecoderClass == null) {
             throw new IllegalArgumentException("Decoder class cannot be set to null");
         }
-        this.regionDecoderFactory=new CompatDecoderFactory<>(regionDecoderClass);
+        this.regionDecoderFactory = new CompatDecoderFactory<>(regionDecoderClass);
     }
 
-    public final void setRegionDecoderFactory(@NonNull DecoderFactory<? extends ImageRegionDecoder> regionDecoderFactory){
+    public final void setRegionDecoderFactory(@NonNull DecoderFactory<? extends ImageRegionDecoder> regionDecoderFactory) {
         //noinspection ConstantConditions
-        if(regionDecoderFactory==null){
+        if (regionDecoderFactory == null) {
             throw new IllegalArgumentException("Decoder factory cannot be set to null");
         }
-        this.regionDecoderFactory=regionDecoderFactory;
+        this.regionDecoderFactory = regionDecoderFactory;
     }
 
-    public final void setBitmapDecoderClass(@NonNull Class<? extends ImageDecoder> bitmapDecoderClass){
+    public final void setBitmapDecoderClass(@NonNull Class<? extends ImageDecoder> bitmapDecoderClass) {
         //noinspection ConstantConditions
-        if(bitmapDecoderClass==null){
+        if (bitmapDecoderClass == null) {
             throw new IllegalArgumentException("Decoder class cannot be set to null");
         }
-        this.bitmapDecoderFactory=new CompatDecoderFactory<>(bitmapDecoderClass);
+        this.bitmapDecoderFactory = new CompatDecoderFactory<>(bitmapDecoderClass);
     }
 
-    public final void setBitmapDecoderFactory(@NonNull DecoderFactory<? extends ImageDecoder> bitmapDecoderFactory){
+    public final void setBitmapDecoderFactory(@NonNull DecoderFactory<? extends ImageDecoder> bitmapDecoderFactory) {
         //noinspection ConstantConditions
-        if(bitmapDecoderFactory==null){
+        if (bitmapDecoderFactory == null) {
             throw new IllegalArgumentException("Decoder factory cannot be set to null");
         }
-        this.bitmapDecoderFactory=bitmapDecoderFactory;
+        this.bitmapDecoderFactory = bitmapDecoderFactory;
     }
 
-    public final void getPanRemaining(RectF vTarget){
-        if(!isReady()){
+    public final void getPanRemaining(RectF vTarget) {
+        if (!isReady()) {
             return;
         }
 
-        float scaleWidth=scale*sWidth();
-        float scaleHeight=scale*sHeight();
+        float scaleWidth = scale * sWidth();
+        float scaleHeight = scale * sHeight();
 
-        if(panLimit==PAN_LIMIT_CENTER){
-            vTarget.top=Math.max(0,-(vTranslate.y-(getHeight()/2)));
-            vTarget.left=Math.max(0,-(vTranslate.x-(getWidth()/2)));
-            vTarget.bottom=Math.max(0,vTranslate.y-((getHeight()/2)-scaleHeight));
-            vTarget.right=Math.max(0,vTranslate.x-((getWidth()/2)-scaleWidth));
-        } else if(panLimit==PAN_LIMIT_OUTSIDE){
-            vTarget.top=Math.max(0,-(vTranslate.y-getHeight()));
-            vTarget.left=Math.max(0,-(vTranslate.x-getWidth()));
-            vTarget.bottom=Math.max(0,vTranslate.y+scaleHeight);
-            vTarget.right=Math.max(0,vTranslate.x+scaleWidth);
-        } else{
-            vTarget.top=Math.max(0,-vTranslate.y);
-            vTarget.left=Math.max(0,-vTranslate.x);
-            vTarget.bottom=Math.max(0,(scaleHeight+vTranslate.y)-getHeight());
-            vTarget.right=Math.max(0,(scaleWidth+vTranslate.x)-getWidth());
+        if (panLimit == PAN_LIMIT_CENTER) {
+            vTarget.top = Math.max(0, -(vTranslate.y - (getHeight() / 2)));
+            vTarget.left = Math.max(0, -(vTranslate.x - (getWidth() / 2)));
+            vTarget.bottom = Math.max(0, vTranslate.y - ((getHeight() / 2) - scaleHeight));
+            vTarget.right = Math.max(0, vTranslate.x - ((getWidth() / 2) - scaleWidth));
+        } else if (panLimit == PAN_LIMIT_OUTSIDE) {
+            vTarget.top = Math.max(0, -(vTranslate.y - getHeight()));
+            vTarget.left = Math.max(0, -(vTranslate.x - getWidth()));
+            vTarget.bottom = Math.max(0, vTranslate.y + scaleHeight);
+            vTarget.right = Math.max(0, vTranslate.x + scaleWidth);
+        } else {
+            vTarget.top = Math.max(0, -vTranslate.y);
+            vTarget.left = Math.max(0, -vTranslate.x);
+            vTarget.bottom = Math.max(0, (scaleHeight + vTranslate.y) - getHeight());
+            vTarget.right = Math.max(0, (scaleWidth + vTranslate.x) - getWidth());
         }
     }
 
-    public final void setPanLimit(int panLimit){
-        if(!VALID_PAN_LIMITS.contains(panLimit)){
-            throw new IllegalArgumentException("Invalid pan limit: "+panLimit);
+    public final void setPanLimit(int panLimit) {
+        if (!VALID_PAN_LIMITS.contains(panLimit)) {
+            throw new IllegalArgumentException("Invalid pan limit: " + panLimit);
         }
-        this.panLimit=panLimit;
-        if(isReady()){
+        this.panLimit = panLimit;
+        if (isReady()) {
             fitToBounds(true);
             invalidate();
         }
     }
 
-    public final void setMinimumScaleType(int scaleType){
-        if(!VALID_SCALE_TYPES.contains(scaleType)){
-            throw new IllegalArgumentException("Invalid scale type: "+scaleType);
+    public final void setMinimumScaleType(int scaleType) {
+        if (!VALID_SCALE_TYPES.contains(scaleType)) {
+            throw new IllegalArgumentException("Invalid scale type: " + scaleType);
         }
-        this.minimumScaleType=scaleType;
-        if(isReady()){
+        this.minimumScaleType = scaleType;
+        if (isReady()) {
             fitToBounds(true);
             invalidate();
         }
     }
 
-    public final void setMaxScale(float maxScale){
-        this.maxScale=maxScale;
+    public final void setMinimumDpi(int dpi) {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        float averageDpi = (metrics.xdpi + metrics.ydpi) / 2;
+        setMaxScale(averageDpi / dpi);
     }
 
-    public final void setMinScale(float minScale){
-        this.minScale=minScale;
+    public final void setMaximumDpi(int dpi) {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        float averageDpi = (metrics.xdpi + metrics.ydpi) / 2;
+        setMinScale(averageDpi / dpi);
     }
 
-    public final void setMinimumDpi(int dpi){
-        DisplayMetrics metrics=getResources().getDisplayMetrics();
-        float averageDpi=(metrics.xdpi+metrics.ydpi)/2;
-        setMaxScale(averageDpi/dpi);
-    }
-
-    public final void setMaximumDpi(int dpi){
-        DisplayMetrics metrics=getResources().getDisplayMetrics();
-        float averageDpi=(metrics.xdpi+metrics.ydpi)/2;
-        setMinScale(averageDpi/dpi);
-    }
-
-    public float getMaxScale(){
+    public float getMaxScale() {
         return maxScale;
     }
 
-    public final float getMinScale(){
+    public final void setMaxScale(float maxScale) {
+        this.maxScale = maxScale;
+    }
+
+    public final float getMinScale() {
         return minScale();
     }
 
-    public void setMinimumTileDpi(int minimumTileDpi){
-        DisplayMetrics metrics=getResources().getDisplayMetrics();
-        float averageDpi=(metrics.xdpi+metrics.ydpi)/2;
-        this.minimumTileDpi=(int)Math.min(averageDpi,minimumTileDpi);
-        if(isReady()){
+    public final void setMinScale(float minScale) {
+        this.minScale = minScale;
+    }
+
+    public void setMinimumTileDpi(int minimumTileDpi) {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        float averageDpi = (metrics.xdpi + metrics.ydpi) / 2;
+        this.minimumTileDpi = (int) Math.min(averageDpi, minimumTileDpi);
+        if (isReady()) {
             reset(false);
             invalidate();
         }
     }
 
     @Nullable
-    public final PointF getCenter(){
-        int mX=getWidth()/2;
-        int mY=getHeight()/2;
-        return viewToSourceCoord(mX,mY);
+    public final PointF getCenter() {
+        int mX = getWidth() / 2;
+        int mY = getHeight() / 2;
+        return viewToSourceCoord(mX, mY);
     }
 
-    public final float getScale(){
-        if(isCallSuperOnDraw){
+    public final float getScale() {
+        if (isCallSuperOnDraw) {
             return super.getScale();
         }
         return scale;
     }
 
-    public final void setScaleAndCenter(float scale,@Nullable PointF sCenter){
-        this.anim=null;
-        this.pendingScale=scale;
-        this.sPendingCenter=sCenter;
-        this.sRequestedCenter=sCenter;
+    public final void setScaleAndCenter(float scale, @Nullable PointF sCenter) {
+        this.anim = null;
+        this.pendingScale = scale;
+        this.sPendingCenter = sCenter;
+        this.sRequestedCenter = sCenter;
         invalidate();
     }
 
-    public final void resetScaleAndCenter(){
-        this.anim=null;
-        this.pendingScale=limitedScale(0);
-        if(isReady()){
-            this.sPendingCenter=new PointF(sWidth()/2,sHeight()/2);
-        } else{
-            this.sPendingCenter=new PointF(0,0);
+    public final void resetScaleAndCenter() {
+        this.anim = null;
+        this.pendingScale = limitedScale(0);
+        if (isReady()) {
+            this.sPendingCenter = new PointF(sWidth() / 2, sHeight() / 2);
+        } else {
+            this.sPendingCenter = new PointF(0, 0);
         }
         invalidate();
     }
 
-    public final boolean isReady(){
+    public final boolean isReady() {
         return readySent;
     }
 
     @SuppressWarnings("EmptyMethod")
-    protected void onReady(){
+    protected void onReady() {
 
     }
 
-    public final boolean isImageLoaded(){
+    public final boolean isImageLoaded() {
         return imageLoadedSent;
     }
 
     @SuppressWarnings("EmptyMethod")
-    protected void onImageLoaded(){
+    protected void onImageLoaded() {
 
     }
 
-    public final int getSWidth(){
+    public final int getSWidth() {
         return sWidth;
     }
 
-    public final int getSHeight(){
+    public final int getSHeight() {
         return sHeight;
     }
 
-    public final int getOrientation(){
+    public final int getOrientation() {
         return orientation;
     }
 
-    public final int getAppliedOrientation(){
+    public final void setOrientation(int orientation) {
+        if (!VALID_ORIENTATIONS.contains(orientation)) {
+            throw new IllegalArgumentException("Invalid orientation: " + orientation);
+        }
+        this.orientation = orientation;
+        reset(false);
+        invalidate();
+        requestLayout();
+    }
+
+    public final int getAppliedOrientation() {
         return getRequiredRotation();
     }
 
     @Nullable
-    public final ImageViewState getState(){
-        if(vTranslate!=null&&sWidth>0&&sHeight>0){
+    public final ImageViewState getState() {
+        if (vTranslate != null && sWidth > 0 && sHeight > 0) {
             //noinspection ConstantConditions
-            return new ImageViewState(getScale(),getCenter(),getOrientation());
+            return new ImageViewState(getScale(), getCenter(), getOrientation());
         }
         return null;
     }
 
-    public final boolean isZoomEnabled(){
+    public final boolean isZoomEnabled() {
         return zoomEnabled;
     }
 
-    public final void setZoomEnabled(boolean zoomEnabled){
-        this.zoomEnabled=zoomEnabled;
+    public final void setZoomEnabled(boolean zoomEnabled) {
+        this.zoomEnabled = zoomEnabled;
     }
 
-    public final boolean isQuickScaleEnabled(){
+    public final boolean isQuickScaleEnabled() {
         return quickScaleEnabled;
     }
 
-    public final void setQuickScaleEnabled(boolean quickScaleEnabled){
-        this.quickScaleEnabled=quickScaleEnabled;
+    public final void setQuickScaleEnabled(boolean quickScaleEnabled) {
+        this.quickScaleEnabled = quickScaleEnabled;
     }
 
-    public final boolean isPanEnabled(){
+    public final boolean isPanEnabled() {
         return panEnabled;
     }
 
-    public final void setPanEnabled(boolean panEnabled){
-        this.panEnabled=panEnabled;
-        if(!panEnabled&&vTranslate!=null){
-            vTranslate.x=(getWidth()/2)-(scale*(sWidth()/2));
-            vTranslate.y=(getHeight()/2)-(scale*(sHeight()/2));
-            if(isReady()){
+    public final void setPanEnabled(boolean panEnabled) {
+        this.panEnabled = panEnabled;
+        if (!panEnabled && vTranslate != null) {
+            vTranslate.x = (getWidth() / 2) - (scale * (sWidth() / 2));
+            vTranslate.y = (getHeight() / 2) - (scale * (sHeight() / 2));
+            if (isReady()) {
                 refreshRequiredTiles(true);
                 invalidate();
             }
         }
     }
 
-    public final void setTileBackgroundColor(int tileBgColor){
-        if(Color.alpha(tileBgColor)==0){
-            tileBgPaint=null;
-        } else{
-            tileBgPaint=new Paint();
+    public final void setTileBackgroundColor(int tileBgColor) {
+        if (Color.alpha(tileBgColor) == 0) {
+            tileBgPaint = null;
+        } else {
+            tileBgPaint = new Paint();
             tileBgPaint.setStyle(Style.FILL);
             tileBgPaint.setColor(tileBgColor);
         }
         invalidate();
     }
 
-    public final void setDoubleTapZoomScale(float doubleTapZoomScale){
-        this.doubleTapZoomScale=doubleTapZoomScale;
+    public final void setDoubleTapZoomScale(float doubleTapZoomScale) {
+        this.doubleTapZoomScale = doubleTapZoomScale;
     }
 
-    public final void setDoubleTapZoomDpi(int dpi){
-        DisplayMetrics metrics=getResources().getDisplayMetrics();
-        float averageDpi=(metrics.xdpi+metrics.ydpi)/2;
-        setDoubleTapZoomScale(averageDpi/dpi);
+    public final void setDoubleTapZoomDpi(int dpi) {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        float averageDpi = (metrics.xdpi + metrics.ydpi) / 2;
+        setDoubleTapZoomScale(averageDpi / dpi);
     }
 
-    public final void setDoubleTapZoomStyle(int doubleTapZoomStyle){
-        if(!VALID_ZOOM_STYLES.contains(doubleTapZoomStyle)){
-            throw new IllegalArgumentException("Invalid zoom style: "+doubleTapZoomStyle);
+    public final void setDoubleTapZoomStyle(int doubleTapZoomStyle) {
+        if (!VALID_ZOOM_STYLES.contains(doubleTapZoomStyle)) {
+            throw new IllegalArgumentException("Invalid zoom style: " + doubleTapZoomStyle);
         }
-        this.doubleTapZoomStyle=doubleTapZoomStyle;
+        this.doubleTapZoomStyle = doubleTapZoomStyle;
     }
 
-    public final void setDoubleTapZoomDuration(int durationMs){
-        this.doubleTapZoomDuration=Math.max(0,durationMs);
+    public final void setDoubleTapZoomDuration(int durationMs) {
+        this.doubleTapZoomDuration = Math.max(0, durationMs);
     }
 
-    public void setExecutor(@NonNull Executor executor){
+    public void setExecutor(@NonNull Executor executor) {
         //noinspection ConstantConditions
-        if(executor==null){
+        if (executor == null) {
             throw new NullPointerException("Executor must not be null");
         }
-        this.executor=executor;
+        this.executor = executor;
     }
 
-    public void setEagerLoadingEnabled(boolean eagerLoadingEnabled){
-        this.eagerLoadingEnabled=eagerLoadingEnabled;
+    public void setEagerLoadingEnabled(boolean eagerLoadingEnabled) {
+        this.eagerLoadingEnabled = eagerLoadingEnabled;
     }
 
-    public final void setDebug(boolean debug){
-        this.debug=debug;
+    public final void setDebug(boolean debug) {
+        this.debug = debug;
     }
 
-    public boolean hasImage(){
-        return uri!=null||bitmap!=null;
+    public boolean hasImage() {
+        return uri != null || bitmap != null;
     }
 
-
-    public void setOnImageEventListener(OnImageEventListener onImageEventListener){
-        this.onImageEventListener=onImageEventListener;
+    public void setOnImageEventListener(OnImageEventListener onImageEventListener) {
+        this.onImageEventListener = onImageEventListener;
     }
 
-    public void setOnStateChangedListener(OnStateChangedListener onStateChangedListener){
-        this.onStateChangedListener=onStateChangedListener;
+    public void setOnStateChangedListener(OnStateChangedListener onStateChangedListener) {
+        this.onStateChangedListener = onStateChangedListener;
     }
 
-    protected void sendStateChanged(float oldScale,PointF oldVTranslate,int origin){
-        if(onStateChangedListener!=null&&scale!=oldScale){
-            onStateChangedListener.onScaleChanged(scale,origin);
+    protected void sendStateChanged(float oldScale, PointF oldVTranslate, int origin) {
+        if (onStateChangedListener != null && scale != oldScale) {
+            onStateChangedListener.onScaleChanged(scale, origin);
         }
-        if(onStateChangedListener!=null&&!vTranslate.equals(oldVTranslate)){
-            onStateChangedListener.onCenterChanged(getCenter(),origin);
+        if (onStateChangedListener != null && !vTranslate.equals(oldVTranslate)) {
+            onStateChangedListener.onCenterChanged(getCenter(), origin);
         }
     }
 
     @Nullable
-    public AnimationBuilder animateCenter(PointF sCenter){
-        if(!isReady()){
+    public AnimationBuilder animateCenter(PointF sCenter) {
+        if (!isReady()) {
             return null;
         }
         return new AnimationBuilder(sCenter);
     }
 
     @Nullable
-    public AnimationBuilder animateScale(float scale){
-        if(!isReady()){
+    public AnimationBuilder animateScale(float scale) {
+        if (!isReady()) {
             return null;
         }
         return new AnimationBuilder(scale);
     }
 
     @Nullable
-    public AnimationBuilder animateScaleAndCenter(float scale,PointF sCenter){
-        if(!isReady()){
+    public AnimationBuilder animateScaleAndCenter(float scale, PointF sCenter) {
+        if (!isReady()) {
             return null;
         }
-        return new AnimationBuilder(scale,sCenter);
+        return new AnimationBuilder(scale, sCenter);
     }
-
-    private volatile boolean isRequestScaleCenter=false;
 
     /**
      * 请求居中并缩放最小
      */
-    public void requestLayoutAndroidScaleCenter(){
-        isRequestScaleCenter=!isCallSuperOnDraw;
+    public void requestLayoutAndroidScaleCenter() {
+        isRequestScaleCenter = !isCallSuperOnDraw;
         requestLayout();
     }
 
     @Override
-    protected void onLayout(boolean changed,int left,int top,int right,int bottom){
-        super.onLayout(changed,left,top,right,bottom);
-        if(isRequestScaleCenter){
-            setScaleAndCenter(getMinScale(),getCenter());
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        if (isRequestScaleCenter) {
+            setScaleAndCenter(getMinScale(), getCenter());
         }
-        isRequestScaleCenter=false;
+        isRequestScaleCenter = false;
     }
 
-    public final class AnimationBuilder{
-
-        protected final float targetScale;
-        protected final PointF targetSCenter;
-        protected final PointF vFocus;
-        protected long duration=500;
-        protected int easing=EASE_IN_OUT_QUAD;
-        protected int origin=ORIGIN_ANIM;
-        protected boolean interruptible=true;
-        protected boolean panLimited=true;
-        protected OnAnimationEventListener listener;
-
-        protected AnimationBuilder(PointF sCenter){
-            this.targetScale=scale;
-            this.targetSCenter=sCenter;
-            this.vFocus=null;
-        }
-
-        protected AnimationBuilder(float scale){
-            this.targetScale=scale;
-            this.targetSCenter=getCenter();
-            this.vFocus=null;
-        }
-
-        protected AnimationBuilder(float scale,PointF sCenter){
-            this.targetScale=scale;
-            this.targetSCenter=sCenter;
-            this.vFocus=null;
-        }
-
-        protected AnimationBuilder(float scale,PointF sCenter,PointF vFocus){
-            this.targetScale=scale;
-            this.targetSCenter=sCenter;
-            this.vFocus=vFocus;
-        }
-
-        @NonNull
-        public AnimationBuilder withDuration(long duration){
-            this.duration=duration;
-            return this;
-        }
-
-        @NonNull
-        public AnimationBuilder withInterruptible(boolean interruptible){
-            this.interruptible=interruptible;
-            return this;
-        }
-
-        @NonNull
-        public AnimationBuilder withEasing(int easing){
-            if(!VALID_EASING_STYLES.contains(easing)){
-                throw new IllegalArgumentException("Unknown easing type: "+easing);
+    /**
+     * 模拟点击
+     *
+     * @param zoomX
+     * @param zoomY
+     */
+    public void onSimulationZoom(int zoomStyle,float zoomX, float zoomY) {
+        PointF pointF = new PointF(zoomX, zoomY);
+        if (!panEnabled) {
+            if (sRequestedCenter != null) {
+                // With a center specified from code, zoom around that point.
+                pointF.x = sRequestedCenter.x;
+                pointF.y = sRequestedCenter.y;
+            } else {
+                // With no requested center, scale around the image center.
+                pointF.x = sWidth() / 2;
+                pointF.y = sHeight() / 2;
             }
-            this.easing=easing;
-            return this;
         }
+        //双击缩放
+        float doubleTapZoomScale = Math.min(maxScale, ScaleImageView.this.doubleTapZoomScale);
+//        boolean zoomIn=(scale<=doubleTapZoomScale*0.9)||scale==minScale;
+        //改!如果已经缩放过了,再次双击则缩小
+        boolean zoomIn = scale <= minScale() * 1.2;
 
-        @NonNull
-        public AnimationBuilder withOnAnimationEventListener(OnAnimationEventListener listener){
-            this.listener=listener;
-            return this;
+        float targetScale = zoomIn ? doubleTapZoomScale : minScale();
+
+         if (zoomStyle == ZOOM_FOCUS_CENTER || !zoomIn || !panEnabled) {
+            new AnimationBuilder(targetScale, pointF).withInterruptible(false)
+                    .withDuration(doubleTapZoomDuration)
+                    .withOrigin(ORIGIN_DOUBLE_TAP_ZOOM)
+                    .start();
+        } else if (zoomStyle == ZOOM_FOCUS_FIXED) {
+            new AnimationBuilder(targetScale, pointF, pointF).withInterruptible(false)
+                    .withDuration(doubleTapZoomDuration)
+                    .withOrigin(ORIGIN_DOUBLE_TAP_ZOOM)
+                    .start();
+        }else {
+             setScaleAndCenter(targetScale, pointF);
+         }
+        invalidate();
+    }
+
+    @Override
+    public void setImageDrawable(Drawable drawable) {
+        isOnImageSource = false;
+        isCallSuperOnDraw = true;
+        if (bitmap != null) {
+            bitmap.recycle();
         }
+        bitmap = null;
+        super.setImageDrawable(drawable);
+    }
 
-        @NonNull
-        protected AnimationBuilder withPanLimited(boolean panLimited){
-            this.panLimited=panLimited;
-            return this;
-        }
-
-        @NonNull
-        protected AnimationBuilder withOrigin(int origin){
-            this.origin=origin;
-            return this;
-        }
-
-        public void start(){
-            if(anim!=null&&anim.listener!=null){
-                try{
-                    anim.listener.onInterruptedByNewAnim();
-                } catch(Exception e){
-                    Log.w(TAG,"Error thrown by animation listener",e);
-                }
-            }
-
-            int vxCenter=getPaddingLeft()+(getWidth()-getPaddingRight()-getPaddingLeft())/2;
-            int vyCenter=getPaddingTop()+(getHeight()-getPaddingBottom()-getPaddingTop())/2;
-            float targetScale=limitedScale(this.targetScale);
-            PointF targetSCenter=panLimited ? limitedSCenter(this.targetSCenter.x,
-                                                             this.targetSCenter.y,
-                                                             targetScale,
-                                                             new PointF()) : this.targetSCenter;
-            anim=new Anim();
-            anim.scaleStart=scale;
-            anim.scaleEnd=targetScale;
-            anim.time=System.currentTimeMillis();
-            anim.sCenterEndRequested=targetSCenter;
-            anim.sCenterStart=getCenter();
-            anim.sCenterEnd=targetSCenter;
-            anim.vFocusStart=sourceToViewCoord(targetSCenter);
-            anim.vFocusEnd=new PointF(vxCenter,vyCenter);
-            anim.duration=duration;
-            anim.interruptible=interruptible;
-            anim.easing=easing;
-            anim.origin=origin;
-            anim.time=System.currentTimeMillis();
-            anim.listener=listener;
-
-            if(vFocus!=null){
-                // Calculate where translation will be at the end of the anim
-                float vTranslateXEnd=vFocus.x-(targetScale*anim.sCenterStart.x);
-                float vTranslateYEnd=vFocus.y-(targetScale*anim.sCenterStart.y);
-                ScaleAndTranslate satEnd=new ScaleAndTranslate(targetScale,new PointF(vTranslateXEnd,vTranslateYEnd));
-                // Fit the end translation into bounds
-                fitToBounds(true,satEnd);
-                // Adjust the position of the focus point at end so image will be in bounds
-                anim.vFocusEnd=new PointF(vFocus.x+(satEnd.vTranslate.x-vTranslateXEnd),
-                                          vFocus.y+(satEnd.vTranslate.y-vTranslateYEnd));
-            }
-
-            invalidate();
-        }
-
+    @Override
+    public void setOnDoubleTapListener(GestureDetector.OnDoubleTapListener onDoubleTapListener) {
+        super.setOnDoubleTapListener(onDoubleTapListener);
+        this.onDoubleTapListener = onDoubleTapListener;
     }
 
     @SuppressWarnings("EmptyMethod")
-    public interface OnAnimationEventListener{
+    public interface OnAnimationEventListener {
 
         void onComplete();
 
@@ -2475,21 +2380,8 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
 
     }
 
-    public static class DefaultOnAnimationEventListener implements OnAnimationEventListener{
-
-        @Override
-        public void onComplete(){ }
-
-        @Override
-        public void onInterruptedByUser(){ }
-
-        @Override
-        public void onInterruptedByNewAnim(){ }
-
-    }
-
     @SuppressWarnings("EmptyMethod")
-    public interface OnImageEventListener{
+    public interface OnImageEventListener {
 
         void onReady();
 
@@ -2504,61 +2396,69 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
         void onPreviewReleased();
     }
 
-    public static class DefaultOnImageEventListener implements OnImageEventListener{
-
-        @Override
-        public void onReady(){ }
-
-        @Override
-        public void onImageLoaded(){ }
-
-        @Override
-        public void onPreviewLoadError(Exception e){ }
-
-        @Override
-        public void onImageLoadError(Exception e){ }
-
-        @Override
-        public void onTileLoadError(Exception e){ }
-
-        @Override
-        public void onPreviewReleased(){ }
-
-    }
-
     @SuppressWarnings("EmptyMethod")
-    public interface OnStateChangedListener{
+    public interface OnStateChangedListener {
 
-        void onScaleChanged(float newScale,int origin);
+        void onScaleChanged(float newScale, int origin);
 
-        void onCenterChanged(PointF newCenter,int origin);
-
-    }
-
-    public static class DefaultOnStateChangedListener implements OnStateChangedListener{
-
-        @Override
-        public void onCenterChanged(PointF newCenter,int origin){ }
-
-        @Override
-        public void onScaleChanged(float newScale,int origin){ }
+        void onCenterChanged(PointF newCenter, int origin);
 
     }
 
-    @Override
-    public void setImageDrawable(Drawable drawable){
-        isCallSuperOnDraw=true;
-        if(bitmap!=null){
-            bitmap.recycle();
+    public static class DefaultOnAnimationEventListener implements OnAnimationEventListener {
+
+        @Override
+        public void onComplete() {
         }
-        bitmap = null;
-        super.setImageDrawable(drawable);
+
+        @Override
+        public void onInterruptedByUser() {
+        }
+
+        @Override
+        public void onInterruptedByNewAnim() {
+        }
+
     }
 
-    @Override
-    public void setOnDoubleTapListener(GestureDetector.OnDoubleTapListener onDoubleTapListener) {
-        super.setOnDoubleTapListener(onDoubleTapListener);
-        this.onDoubleTapListener = onDoubleTapListener;
+    public static class DefaultOnImageEventListener implements OnImageEventListener {
+
+        @Override
+        public void onReady() {
+        }
+
+        @Override
+        public void onImageLoaded() {
+        }
+
+        @Override
+        public void onPreviewLoadError(Exception e) {
+        }
+
+        @Override
+        public void onImageLoadError(Exception e) {
+        }
+
+        @Override
+        public void onTileLoadError(Exception e) {
+        }
+
+        @Override
+        public void onPreviewReleased() {
+        }
+
+    }
+
+    public static class DefaultOnStateChangedListener implements OnStateChangedListener {
+
+        @Override
+        public void onCenterChanged(PointF newCenter, int origin) {
+        }
+
+        @Override
+        public void onScaleChanged(float newScale, int origin) {
+        }
+
     }
 
     protected static class TilesInitTask extends AsyncTask<Void, Void, int[]> {
@@ -2797,4 +2697,130 @@ public class ScaleImageView extends PhotoView implements IScaleImageView{
         protected Rect fileSRect;
 
     }
+
+    public final class AnimationBuilder {
+
+        protected final float targetScale;
+        protected final PointF targetSCenter;
+        protected final PointF vFocus;
+        protected long duration = 500;
+        protected int easing = EASE_IN_OUT_QUAD;
+        protected int origin = ORIGIN_ANIM;
+        protected boolean interruptible = true;
+        protected boolean panLimited = true;
+        protected OnAnimationEventListener listener;
+
+        protected AnimationBuilder(PointF sCenter) {
+            this.targetScale = scale;
+            this.targetSCenter = sCenter;
+            this.vFocus = null;
+        }
+
+        protected AnimationBuilder(float scale) {
+            this.targetScale = scale;
+            this.targetSCenter = getCenter();
+            this.vFocus = null;
+        }
+
+        protected AnimationBuilder(float scale, PointF sCenter) {
+            this.targetScale = scale;
+            this.targetSCenter = sCenter;
+            this.vFocus = null;
+        }
+
+        protected AnimationBuilder(float scale, PointF sCenter, PointF vFocus) {
+            this.targetScale = scale;
+            this.targetSCenter = sCenter;
+            this.vFocus = vFocus;
+        }
+
+        @NonNull
+        public AnimationBuilder withDuration(long duration) {
+            this.duration = duration;
+            return this;
+        }
+
+        @NonNull
+        public AnimationBuilder withInterruptible(boolean interruptible) {
+            this.interruptible = interruptible;
+            return this;
+        }
+
+        @NonNull
+        public AnimationBuilder withEasing(int easing) {
+            if (!VALID_EASING_STYLES.contains(easing)) {
+                throw new IllegalArgumentException("Unknown easing type: " + easing);
+            }
+            this.easing = easing;
+            return this;
+        }
+
+        @NonNull
+        public AnimationBuilder withOnAnimationEventListener(OnAnimationEventListener listener) {
+            this.listener = listener;
+            return this;
+        }
+
+        @NonNull
+        protected AnimationBuilder withPanLimited(boolean panLimited) {
+            this.panLimited = panLimited;
+            return this;
+        }
+
+        @NonNull
+        protected AnimationBuilder withOrigin(int origin) {
+            this.origin = origin;
+            return this;
+        }
+
+        public void start() {
+            if (anim != null && anim.listener != null) {
+                try {
+                    anim.listener.onInterruptedByNewAnim();
+                } catch (Exception e) {
+                    Log.w(TAG, "Error thrown by animation listener", e);
+                }
+            }
+
+            int vxCenter = getPaddingLeft() + (getWidth() - getPaddingRight() - getPaddingLeft()) / 2;
+            int vyCenter = getPaddingTop() + (getHeight() - getPaddingBottom() - getPaddingTop()) / 2;
+            float targetScale = limitedScale(this.targetScale);
+            PointF targetSCenter = panLimited ? limitedSCenter(this.targetSCenter.x,
+                    this.targetSCenter.y,
+                    targetScale,
+                    new PointF()) : this.targetSCenter;
+            anim = new Anim();
+            anim.scaleStart = scale;
+            anim.scaleEnd = targetScale;
+            anim.time = System.currentTimeMillis();
+            anim.sCenterEndRequested = targetSCenter;
+            anim.sCenterStart = getCenter();
+            anim.sCenterEnd = targetSCenter;
+            anim.vFocusStart = sourceToViewCoord(targetSCenter);
+            anim.vFocusEnd = new PointF(vxCenter, vyCenter);
+            anim.duration = duration;
+            anim.interruptible = interruptible;
+            anim.easing = easing;
+            anim.origin = origin;
+            anim.time = System.currentTimeMillis();
+            anim.listener = listener;
+
+            if (vFocus != null) {
+                // Calculate where translation will be at the end of the anim
+                float vTranslateXEnd = vFocus.x - (targetScale * anim.sCenterStart.x);
+                float vTranslateYEnd = vFocus.y - (targetScale * anim.sCenterStart.y);
+                ScaleAndTranslate satEnd = new ScaleAndTranslate(targetScale, new PointF(vTranslateXEnd, vTranslateYEnd));
+                // Fit the end translation into bounds
+                fitToBounds(true, satEnd);
+                // Adjust the position of the focus point at end so image will be in bounds
+                anim.vFocusEnd = new PointF(vFocus.x + (satEnd.vTranslate.x - vTranslateXEnd),
+                        vFocus.y + (satEnd.vTranslate.y - vTranslateYEnd));
+            }
+
+            invalidate();
+        }
+
+    }
+
+
 }

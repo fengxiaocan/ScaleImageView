@@ -1,6 +1,5 @@
 package com.app.pager;
 
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
@@ -9,30 +8,23 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.DataSource;
-import com.bumptech.glide.load.engine.GlideException;
-import com.bumptech.glide.request.RequestListener;
-import com.bumptech.glide.request.target.Target;
 import com.scale.image.ImageSource;
 import com.scale.image.ScaleImageView;
 
-import java.io.File;
 import java.util.ArrayList;
 
-public class ImageActivity extends AppCompatActivity{
+public class ImageActivity extends AppCompatActivity {
     private ImageWatcher imageWatcher;
 
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState){
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_image);
-        imageWatcher=findViewById(R.id.image_watcher);
-        imageWatcher.setImageLoader(new ImageWatcher.ImageLoader(){
-
+        imageWatcher = findViewById(R.id.image_watcher);
+        imageWatcher.setImageLoader(new ImageWatcher.ImageLoader() {
             @Override
-            public void loadImage(final ScaleImageView imageView,String path,int position){
-
-                if(position%2==0){
+            public void loadImage(final ScaleImageView imageView, String path, int position) {
+                if (position % 2 == 0) {
                     Glide.with(imageView.getContext()).load("file:///android_asset/abd.gif").into(imageView);
 //                    Glide.with(imageView.getContext())
 //                         .asFile()
@@ -63,36 +55,36 @@ public class ImageActivity extends AppCompatActivity{
 //                             }
 //                         })
 //                         .submit();
-                } else{
-                    imageView.setImage(ImageSource.asset("IMG_1505.JPG"));
+                } else {
+                    imageView.setImage(ImageSource.asset("WechatIMG18632.jpeg"));
                 }
             }
         });
-        ArrayList<String> datas=new ArrayList<>();
+        ArrayList<String> datas = new ArrayList<>();
         datas.add("");
         datas.add("");
         datas.add("");
         datas.add("");
         datas.add("");
-        imageWatcher.setDatas(datas,0);
-        imageWatcher.setOnLongClickListener(new View.OnLongClickListener(){
+        imageWatcher.setDatas(datas, 1);
+        imageWatcher.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
-            public boolean onLongClick(View v){
-                Toast.makeText(ImageActivity.this,"长按了",Toast.LENGTH_SHORT).show();
+            public boolean onLongClick(View v) {
+                Toast.makeText(ImageActivity.this, "长按了", Toast.LENGTH_SHORT).show();
                 return false;
             }
         });
-        imageWatcher.setOnClickListener(new View.OnClickListener(){
+        imageWatcher.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v){
-                Toast.makeText(ImageActivity.this,"单击",Toast.LENGTH_SHORT).show();
+            public void onClick(View v) {
+                Toast.makeText(ImageActivity.this, "单击", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
     @Override
-    public void onBackPressed(){
-        if(imageWatcher.onBackPressed()){
+    public void onBackPressed() {
+        if (imageWatcher.onBackPressed()) {
             return;
         }
         super.onBackPressed();
