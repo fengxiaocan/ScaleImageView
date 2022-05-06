@@ -1,6 +1,22 @@
 apply plugin: 'com.android.library'
 apply plugin: 'com.github.dcendents.android-maven'
+
 group = 'com.github.fengxiaocan'
+
+//gradle版本大于7.0需要
+//afterEvaluate {
+//    publishing {
+//        publications {
+//            release(IResultReceiver) {
+//                from components.release
+//                groupId = 'com.github.fengxiaocan' //groupId 随便取
+//                artifactId = 'ScaleImageView'  //artifactId 随便取
+//                version = '1.0.0'
+//            }
+//        }
+//    }
+//}
+
 
 android {
     compileSdkVersion 29
